@@ -1,0 +1,434 @@
+import { GameState, Player, Monster, CombatLogEntry, MapId, ClassType } from './types';
+import { MAPS, SHOP_ITEMS, createPlayer, rollDice, calculateDamage, levelUp, CLASSES, SKILLS } from './gameData';
+import { nanoid } from 'nanoid';
+
+// Global in-memory state
+declare global {
+  // eslint-disable-next-line no-var
+  var gameRooms: Map<string, GameState>;
+}
+
+if (!global.gameRooms) {
+  global.gameRooms = new Map();
+}
+
+export function getOrCreateRoom(roomId: string): GameState {
+  if (!global.gameRooms.has(roomId)) {
+    const state: GameState = {
+      roomId,
+      phase: 'lobby',
+      players: {},
+      playerOrder: [],
+      currentPlayerIndex: 0,
+      currentMap: 1,
+      currentMonsters: [],
+      turn: 0,
+      turnPhase: 'player_turns',
+      combatLog: [],
+      groupCoins: 0,
+      unlockedMaps: [1],
+      unlockedClasses: ['warrior', 'mage', 'rogue', 'necromancer'],
+      actionsThisTurn: {},
+      shopItems: SHOP_ITEMS,
+    };
+    global.gameRooms.set(roomId, state);
+  }
+  return global.gameRooms.get(roomId)!;
+}
+
+export function getRoom(roomId: string): GameState | undefined {
+  return global.gameRooms.get(roomId);
+}
+
+export function saveRoom(state: GameState): void {
+  global.gameRooms.set(state.roomId, state);
+}
+
+function addLog(state: GameState, message: string, type: CombatLogEntry['type']): void {
+  state.combatLog.push({
+    id: nanoid(),
+    turn: state.turn,
+    message,
+    type,
+    timestamp: Date.now(),
+  });
+  // Keep last 50 entries
+  if (state.combatLog.length > 50) {
+    state.combatLog = state.combatLog.slice(-50);
+  }
+}
+
+export function joinRoom(state: GameState, playerId: string, name: string): GameState {
+  if (Object.keys(state.players).length >= 4) return state;
+  if (state.players[playerId]) return state;
+
+  const newPlayer: Player = {
+    id: playerId,
+    name,
+    classType: 'warrior',
+    level: 1,
+    xp: 0,
+    xpToNextLevel: 100,
+    hp: 0,
+    maxHp: 0,
+    mp: 0,
+    maxMp: 0,
+    attack: 0,
+    defense: 0,
+    baseAttack: 0,
+    baseDefense: 0,
+    inventory: [],
+    coins: 0,
+    isReady: false,
+    isAlive: true,
+    statusEffects: [],
+  };
+
+  state.players[playerId] = newPlayer;
+  if (!state.playerOrder.includes(playerId)) {
+    state.playerOrder.push(playerId);
+  }
+
+  addLog(state, `⚔️ ${name} entrou na sala!`, 'system');
+
+  if (Object.keys(state.players).length >= 1) {
+    state.phase = 'class_selection';
+  }
+
+  return { ...state };
+}
+
+export function selectClass(state: GameState, playerId: string, classType: ClassType): GameState {
+  if (!state.players[playerId]) return state;
+  if (!state.unlockedClasses.includes(classType)) return state;
+
+  const player = createPlayer(playerId, state.players[playerId].name, classType);
+  state.players[playerId] = player;
+  addLog(state, `${state.players[playerId].name} escolheu ${CLASSES[classType].emoji} ${CLASSES[classType].name}!`, 'system');
+
+  return { ...state };
+}
+
+export function setPlayerReady(state: GameState, playerId: string): GameState {
+  if (!state.players[playerId]) return state;
+  state.players[playerId] = { ...state.players[playerId], isReady: true };
+  addLog(state, `✅ ${state.players[playerId].name} está pronto!`, 'system');
+
+  const allReady = Object.values(state.players).every(p => p.isReady);
+  const playerCount = Object.keys(state.players).length;
+
+  if (allReady && playerCount >= 1) {
+    state.phase = 'map_selection';
+    addLog(state, '🗺️ Todos prontos! Escolham o mapa.', 'system');
+  }
+
+  return { ...state };
+}
+
+export function selectMap(state: GameState, playerId: string, mapId: MapId): GameState {
+  if (!state.unlockedMaps.includes(mapId)) return state;
+
+  state.currentMap = mapId;
+  state.phase = 'shopping';
+
+  const mapDef = MAPS.find(m => m.id === mapId)!;
+  addLog(state, `🗺️ Mapa selecionado: ${mapDef.theme} ${mapDef.name}`, 'system');
+  addLog(state, `🛒 Loja aberta! Comprem equipamentos antes da batalha.`, 'system');
+
+  // Give each player some starting coins
+  Object.keys(state.players).forEach(pid => {
+    state.players[pid] = { ...state.players[pid], coins: 50 };
+  });
+
+  return { ...state };
+}
+
+export function buyItem(state: GameState, playerId: string, itemId: string): GameState {
+  const player = state.players[playerId];
+  if (!player) return state;
+
+  const item = SHOP_ITEMS.find(i => i.id === itemId);
+  if (!item) return state;
+  if (player.coins < item.price) return state;
+  if (player.inventory.some(i => i.id === itemId)) return state;
+
+  state.players[playerId] = {
+    ...player,
+    coins: player.coins - item.price,
+    attack: player.attack + item.attackBonus,
+    defense: player.defense + item.defenseBonus,
+    inventory: [...player.inventory, item],
+  };
+
+  addLog(state, `🛒 ${player.name} comprou ${item.emoji} ${item.name}!`, 'system');
+
+  return { ...state };
+}
+
+export function startCombat(state: GameState): GameState {
+  const mapDef = MAPS.find(m => m.id === state.currentMap)!;
+
+  // Spawn monsters (random selection + boss on last wave)
+  const monstersToSpawn = [...mapDef.monsters]
+    .sort(() => Math.random() - 0.5)
+    .slice(0, 2 + Math.floor(Math.random() * 2));
+
+  state.currentMonsters = monstersToSpawn.map(m => ({ ...m, id: nanoid() }));
+  state.phase = 'combat';
+  state.turn = 1;
+  state.turnPhase = 'player_turns';
+  state.actionsThisTurn = {};
+  state.currentPlayerIndex = 0;
+
+  addLog(state, `⚔️ COMBATE INICIADO! Mapa: ${mapDef.name}`, 'system');
+  addLog(state, `👹 Inimigos aparecem: ${state.currentMonsters.map(m => m.emoji + m.name).join(', ')}`, 'system');
+  addLog(state, `🎲 Turno ${state.turn} - Fase dos Jogadores`, 'system');
+
+  return { ...state };
+}
+
+export function processPlayerAction(
+  state: GameState,
+  playerId: string,
+  action: { type: string; targetId?: string; skillIndex?: number; itemId?: string }
+): GameState {
+  if (state.phase !== 'combat') return state;
+  if (state.turnPhase !== 'player_turns') return state;
+  if (state.actionsThisTurn[playerId]) return state;
+
+  const player = state.players[playerId];
+  if (!player || !player.isAlive) return state;
+
+  const mapDef = MAPS.find(m => m.id === state.currentMap)!;
+  const manaMult = mapDef.manaCostMultiplier;
+
+  let updatedPlayer = { ...player };
+
+  if (action.type === 'attack') {
+    const target = state.currentMonsters.find(m => m.id === action.targetId);
+    if (!target) return state;
+
+    const dice = rollDice();
+    let bonus = 0;
+
+    // Necromancer passive buff
+    if (player.necromancerBuff && player.necromancerBuff.turnsLeft > 0) {
+      bonus += player.necromancerBuff.damage;
+    }
+
+    const damage = calculateDamage(player.attack, target.defense, dice, bonus);
+    const monsterIdx = state.currentMonsters.findIndex(m => m.id === action.targetId);
+    state.currentMonsters[monsterIdx] = {
+      ...target,
+      hp: Math.max(0, target.hp - damage),
+    };
+
+    addLog(state, `${player.name} ${CLASSES[player.classType].emoji} ataca ${target.emoji}${target.name}! [Dado: ${dice}] Dano: ${damage}`, 'player_action');
+
+    if (state.currentMonsters[monsterIdx].hp <= 0) {
+      addLog(state, `💀 ${target.emoji}${target.name} foi derrotado!`, 'system');
+      distributeRewards(state, target);
+    }
+  } else if (action.type === 'skill') {
+    const skills = SKILLS[player.classType];
+    const skill = skills[action.skillIndex ?? 3]; // default special
+    if (!skill) return state;
+
+    const mpCost = Math.ceil(skill.mpCost * manaMult);
+    if (updatedPlayer.mp < mpCost) {
+      addLog(state, `❌ ${player.name} não tem Mana suficiente! (${updatedPlayer.mp}/${mpCost} MP necessário)`, 'system');
+      return state;
+    }
+
+    updatedPlayer.mp -= mpCost;
+
+    if (skill.damage && action.targetId) {
+      if (action.skillIndex === 3 && (player.classType === 'mage' || player.classType === 'ranger')) {
+        // AoE
+        const dice = rollDice();
+        state.currentMonsters = state.currentMonsters.map(m => {
+          const dmg = calculateDamage(player.attack + skill.damage!, Math.floor(m.defense * 0.5), dice);
+          const newHp = Math.max(0, m.hp - dmg);
+          addLog(state, `💥 ${skill.emoji} ${skill.name} atinge ${m.emoji}${m.name} por ${dmg} de dano!`, 'player_action');
+          if (newHp <= 0) {
+            addLog(state, `💀 ${m.emoji}${m.name} foi derrotado!`, 'system');
+            distributeRewards(state, m);
+          }
+          return { ...m, hp: newHp };
+        });
+      } else {
+        const target = state.currentMonsters.find(m => m.id === action.targetId);
+        if (target) {
+          const dice = rollDice();
+          const damage = calculateDamage(player.attack + skill.damage, Math.floor(target.defense * 0.5), dice);
+          const monsterIdx = state.currentMonsters.findIndex(m => m.id === action.targetId);
+          state.currentMonsters[monsterIdx] = { ...target, hp: Math.max(0, target.hp - damage) };
+          addLog(state, `${player.name} usa ${skill.emoji} ${skill.name} em ${target.emoji}${target.name}! Dano: ${damage}`, 'player_action');
+          if (state.currentMonsters[monsterIdx].hp <= 0) {
+            addLog(state, `💀 ${target.emoji}${target.name} foi derrotado!`, 'system');
+            distributeRewards(state, target);
+          }
+        }
+      }
+    }
+
+    if (skill.heal) {
+      if (action.skillIndex === 3 && player.classType === 'paladin') {
+        Object.keys(state.players).forEach(pid => {
+          if (state.players[pid].isAlive) {
+            const healed = Math.min(state.players[pid].maxHp, state.players[pid].hp + skill.heal!);
+            state.players[pid] = { ...state.players[pid], hp: healed };
+          }
+        });
+        addLog(state, `${player.name} usa ${skill.emoji} ${skill.name}! Cura ${skill.heal}HP para todos!`, 'player_action');
+      } else if (action.targetId && state.players[action.targetId]) {
+        const target = state.players[action.targetId];
+        const healed = Math.min(target.maxHp, target.hp + skill.heal);
+        state.players[action.targetId] = { ...target, hp: healed };
+        addLog(state, `${player.name} usa ${skill.emoji} ${skill.name} em ${target.name}! Cura ${skill.heal}HP.`, 'player_action');
+      }
+    }
+
+    if (skill.effect === 'necro_buff') {
+      updatedPlayer.necromancerBuff = { damage: 4, turnsLeft: 3 };
+      addLog(state, `${player.name} invoca um Morto-Vivo! +4 dano por 3 turnos!`, 'player_action');
+    }
+  }
+
+  state.players[playerId] = updatedPlayer;
+  state.actionsThisTurn[playerId] = true;
+
+  // Check if all alive players acted
+  const alivePlayers = Object.values(state.players).filter(p => p.isAlive);
+  const allActed = alivePlayers.every(p => state.actionsThisTurn[p.id]);
+
+  if (allActed) {
+    processMonsterTurns(state);
+  }
+
+  // Clean dead monsters
+  state.currentMonsters = state.currentMonsters.filter(m => m.hp > 0);
+
+  checkBattleEnd(state);
+
+  return { ...state };
+}
+
+function distributeRewards(state: GameState, monster: Monster): void {
+  const alivePlayers = Object.values(state.players).filter(p => p.isAlive);
+  const xpEach = Math.ceil(monster.xpReward / alivePlayers.length);
+
+  state.groupCoins += monster.coinReward;
+
+  alivePlayers.forEach(p => {
+    let updatedPlayer = { ...p, xp: p.xp + xpEach };
+    const result = levelUp(updatedPlayer);
+    if (result.didLevelUp) {
+      addLog(state, `🎉 ${p.name} subiu para o nível ${result.player.level}! HP e Dano aumentaram!`, 'level_up');
+    }
+    state.players[p.id] = result.player;
+  });
+
+  addLog(state, `💰 +${monster.coinReward} moedas para o grupo! +${xpEach} XP cada.`, 'system');
+}
+
+function processMonsterTurns(state: GameState): void {
+  state.turnPhase = 'monster_turns';
+  addLog(state, `👹 Fase dos Monstros!`, 'system');
+
+  const aliveMonsters = state.currentMonsters.filter(m => m.hp > 0);
+  const alivePlayers = Object.values(state.players).filter(p => p.isAlive);
+
+  aliveMonsters.forEach(monster => {
+    if (alivePlayers.length === 0) return;
+
+    const target = alivePlayers[Math.floor(Math.random() * alivePlayers.length)];
+    const dice = rollDice();
+    const mapDef = MAPS.find(m => m.id === state.currentMap)!;
+    const effectiveDef = Math.floor(target.defense * (1 - mapDef.defenseDebuff));
+    const damage = calculateDamage(monster.attack, effectiveDef, dice);
+
+    state.players[target.id] = {
+      ...state.players[target.id],
+      hp: Math.max(0, state.players[target.id].hp - damage),
+    };
+
+    if (mapDef.defenseDebuff > 0) {
+      addLog(state, `${monster.emoji}${monster.name} ataca ${target.name}! [Dado: ${dice}] Dano: ${damage} (Defesa reduzida -20%)`, 'monster_action');
+    } else {
+      addLog(state, `${monster.emoji}${monster.name} ataca ${target.name}! [Dado: ${dice}] Dano: ${damage}`, 'monster_action');
+    }
+
+    if (state.players[target.id].hp <= 0) {
+      state.players[target.id] = { ...state.players[target.id], isAlive: false };
+      addLog(state, `💀 ${target.name} foi derrotado!`, 'death');
+    }
+  });
+
+  // Tick necromancer buffs
+  Object.keys(state.players).forEach(pid => {
+    const p = state.players[pid];
+    if (p.necromancerBuff && p.necromancerBuff.turnsLeft > 0) {
+      const newTurns = p.necromancerBuff.turnsLeft - 1;
+      state.players[pid] = {
+        ...p,
+        necromancerBuff: newTurns > 0 ? { ...p.necromancerBuff, turnsLeft: newTurns } : undefined,
+      };
+    }
+  });
+
+  // Next turn
+  state.turn += 1;
+  state.turnPhase = 'player_turns';
+  state.actionsThisTurn = {};
+  state.currentPlayerIndex = 0;
+  addLog(state, `🎲 Turno ${state.turn} - Fase dos Jogadores`, 'system');
+}
+
+function checkBattleEnd(state: GameState): void {
+  const aliveMonsters = state.currentMonsters.filter(m => m.hp > 0);
+  const alivePlayers = Object.values(state.players).filter(p => p.isAlive);
+
+  if (alivePlayers.length === 0) {
+    state.phase = 'defeat';
+    addLog(state, `💀 DERROTA! Todos os jogadores foram derrotados...`, 'system');
+    return;
+  }
+
+  if (aliveMonsters.length === 0) {
+    // Check if there's a boss left
+    const mapDef = MAPS.find(m => m.id === state.currentMap)!;
+    const bossDefeated = !state.currentMonsters.some(m => m.isBoss && m.hp > 0);
+
+    if (bossDefeated && state.currentMonsters.some(m => m.isBoss)) {
+      // Boss was defeated - unlock next map and classes
+      const nextMapId = (state.currentMap + 1) as MapId;
+      if (nextMapId <= 3 && !state.unlockedMaps.includes(nextMapId)) {
+        state.unlockedMaps.push(nextMapId);
+        addLog(state, `🗺️ Mapa ${MAPS.find(m => m.id === nextMapId)?.name} desbloqueado!`, 'system');
+      }
+
+      // Unlock classes
+      if (state.currentMap === 1 && !state.unlockedClasses.includes('paladin')) {
+        state.unlockedClasses.push('paladin');
+        addLog(state, `🛡️ Classe PALADINO desbloqueada!`, 'level_up');
+      }
+      if (state.currentMap === 2 && !state.unlockedClasses.includes('ranger')) {
+        state.unlockedClasses.push('ranger');
+        addLog(state, `🏹 Classe ARQUEIRO desbloqueada!`, 'level_up');
+      }
+
+      state.phase = 'victory';
+      addLog(state, `🏆 VITÓRIA! O ${mapDef.theme} ${mapDef.name} foi conquistado!`, 'system');
+    } else {
+      // Wave cleared, spawn boss
+      addLog(state, `💥 Onda limpa! O BOSS aparece!`, 'system');
+      state.currentMonsters = [{ ...mapDef.boss, id: nanoid() }];
+      state.actionsThisTurn = {};
+    }
+  }
+}
+
+export function resetRoom(roomId: string): void {
+  global.gameRooms.delete(roomId);
+}

@@ -1,66 +1,74 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+'use client';
 
-export default function Home() {
+import { useSocket } from '@/hooks/useSocket';
+import { ClassType, MapId } from '@/lib/types';
+import Lobby from '@/components/Lobby';
+import ClassSelection from '@/components/ClassSelection';
+import MapAndShop from '@/components/MapAndShop';
+import Combat from '@/components/Combat';
+import styles from './page.module.css';
+
+export default function GamePage() {
+  const { gameState, connected, myId, emit } = useSocket();
+
+  if (!connected || !gameState) {
+    return (
+      <div className={styles.loading}>
+        <div className={styles.loadingSpinner} />
+        <p className={styles.loadingText}>Conectando ao servidor...</p>
+      </div>
+    );
+  }
+
+  const phase = gameState.phase;
+
+  if (phase === 'lobby' || (!gameState.players[myId] && phase === 'class_selection')) {
+    return (
+      <Lobby
+        gameState={gameState}
+        myId={myId}
+        onJoin={(name) => emit('player_join', { name })}
+      />
+    );
+  }
+
+  if (phase === 'class_selection') {
+    return (
+      <ClassSelection
+        gameState={gameState}
+        myId={myId}
+        onSelectClass={(classType: ClassType) => emit('select_class', { classType })}
+        onReady={() => emit('player_ready')}
+      />
+    );
+  }
+
+  if (phase === 'map_selection' || phase === 'shopping') {
+    return (
+      <MapAndShop
+        gameState={gameState}
+        myId={myId}
+        onSelectMap={(mapId: MapId) => emit('select_map', { mapId })}
+        onBuyItem={(itemId: string) => emit('buy_item', { itemId })}
+        onStartCombat={() => emit('start_combat')}
+      />
+    );
+  }
+
+  if (phase === 'combat' || phase === 'victory' || phase === 'defeat') {
+    return (
+      <Combat
+        gameState={gameState}
+        myId={myId}
+        onAction={(action) => emit('player_action', action)}
+        onReset={() => emit('reset_game')}
+      />
+    );
+  }
+
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className={styles.intro}>
-          <h1>To get started, edit the page.tsx file.</h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+    <div className={styles.loading}>
+      <p className={styles.loadingText}>Phase: {phase}</p>
     </div>
   );
 }
