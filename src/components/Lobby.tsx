@@ -27,7 +27,7 @@ export default function Lobby({ gameState, myId, onJoin }: Props) {
       <div className={styles.content}>
         <div className={styles.card}>
           <h2 className={styles.cardTitle}>⚔ Sala de Espera</h2>
-          <p className={styles.playerCount}>{playerCount}/4 jogadores</p>
+          <p className={styles.playerCount}>{playerCount}/6 jogadores</p>
 
           <div className={styles.playerList}>
             {Object.values(gameState.players).map(p => (
@@ -73,10 +73,11 @@ export default function Lobby({ gameState, myId, onJoin }: Props) {
         <div className={styles.infoCard}>
           <h3 className={styles.infoTitle}>📜 Como Jogar</h3>
           <ul className={styles.infoList}>
-            <li>1-4 jogadores se unem e escolhem suas classes</li>
-            <li>Explore 3 mapas com dificuldade crescente</li>
-            <li>Combate em turnos: ataque, use habilidades ou itens</li>
-            <li>Derrote o boss para desbloquear novas classes e mapas</li>
+            <li>1-6 jogadores se unem e escolhem suas classes</li>
+            <li>6 classes disponíveis desde o início: Guerreiro, Mago, Ladino, Necromante, Paladino e Arqueiro</li>
+            <li>Explore 7 mapas com dificuldade crescente</li>
+            <li>Combate em turnos: cada jogador age um por vez</li>
+            <li>A loja abre a cada 3 turnos — todos devem clicar em Pronto para continuar</li>
             <li>⚠️ Progresso é perdido se o servidor reiniciar</li>
           </ul>
         </div>

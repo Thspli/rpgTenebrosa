@@ -1,4 +1,16 @@
-export type ClassType = 'warrior' | 'mage' | 'rogue' | 'necromancer' | 'paladin' | 'ranger';
+export type ClassType =
+  | 'warrior'
+  | 'mage'
+  | 'rogue'
+  | 'necromancer'
+  | 'paladin'
+  | 'ranger'
+  | 'assassin'
+  | 'elementalist'
+  | 'berserker'
+  | 'guardian'
+  | 'druid'
+  | 'bard';
 
 export type MapId = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
@@ -6,12 +18,7 @@ export interface ClassDefinition {
   name: string;
   emoji: string;
   description: string;
-  baseStats: {
-    hp: number;
-    mp: number;
-    attack: number;
-    defense: number;
-  };
+  baseStats: { hp: number; mp: number; attack: number; defense: number; };
   special: string;
   unlockedByDefault: boolean;
   unlockMap?: MapId;
@@ -28,6 +35,10 @@ export interface Item {
   hpBonus?: number;
   mpBonus?: number;
   description: string;
+  consumable?: boolean;
+  consumeHeal?: number;
+  consumeMpHeal?: number;
+  quantity?: number;
 }
 
 export interface Player {
@@ -99,9 +110,9 @@ export type GamePhase =
   | 'lobby'
   | 'class_selection'
   | 'map_selection'
-  | 'shopping'           // pre-combat shop or mid-combat break
+  | 'shopping'
   | 'combat'
-  | 'victory_shopping'   // post-boss shop before next map
+  | 'victory_shopping'
   | 'defeat';
 
 export type TurnPhase = 'player_turns' | 'processing' | 'monster_turns' | 'broadcast';
@@ -112,7 +123,7 @@ export interface GameState {
   players: Record<string, Player>;
   playerOrder: string[];
   currentPlayerIndex: number;
-  activePlayerId: string | null; // whose turn it is right now
+  activePlayerId: string | null;
   currentMap: MapId;
   currentMonsters: Monster[];
   turn: number;
@@ -124,24 +135,15 @@ export interface GameState {
   actionsThisTurn: Record<string, boolean>;
   shopItems: Item[];
   bossDefeated: boolean;
-  waveNumber: number; // track waves within a map
-  shopCountdown: number; // turns until next shop break
+  waveNumber: number;
+  shopCountdown: number;
+  shopReady: Record<string, boolean>;
 }
-
-export type SocketEvent =
-  | { type: 'player_join'; payload: { name: string } }
-  | { type: 'select_class'; payload: { classType: ClassType } }
-  | { type: 'player_ready' }
-  | { type: 'select_map'; payload: { mapId: MapId } }
-  | { type: 'player_action'; payload: PlayerAction }
-  | { type: 'buy_item'; payload: { itemId: string } }
-  | { type: 'start_combat' };
 
 export type PlayerAction =
   | { type: 'attack'; targetId: string }
-  | { type: 'special'; targetId: string }
-  | { type: 'use_item'; itemId: string; targetId?: string }
-  | { type: 'skill'; skillIndex: number; targetId: string };
+  | { type: 'use_potion'; itemId: string }
+  | { type: 'skill'; skillIndex: number; targetId?: string };
 
 export interface Skill {
   name: string;
@@ -151,4 +153,5 @@ export interface Skill {
   damage?: number;
   heal?: number;
   effect?: string;
+  aoe?: boolean;
 }

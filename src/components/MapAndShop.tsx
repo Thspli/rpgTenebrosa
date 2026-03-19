@@ -10,18 +10,23 @@ interface Props {
   onSelectMap: (mapId: MapId) => void;
   onBuyItem: (itemId: string) => void;
   onStartCombat: () => void;
-  onContinueCombat: () => void;
+  onShopReady: () => void;
   onProceedToNextMap: () => void;
 }
 
-export default function MapAndShop({ gameState, myId, onSelectMap, onBuyItem, onStartCombat, onContinueCombat, onProceedToNextMap }: Props) {
+export default function MapAndShop({ gameState, myId, onSelectMap, onBuyItem, onStartCombat, onShopReady, onProceedToNextMap }: Props) {
   const myPlayer = gameState.players[myId];
   const phase = gameState.phase;
   const isMidCombatShop = phase === 'shopping' && gameState.turn > 0;
   const isVictoryShop = phase === 'victory_shopping';
+  const isShopPhase = isMidCombatShop || isVictoryShop;
   const currentMap = MAPS.find(m => m.id === gameState.currentMap);
   const nextMapId = (gameState.currentMap + 1) as MapId;
   const nextMap = MAPS.find(m => m.id === nextMapId);
+  const amIReady = !!gameState.shopReady?.[myId];
+  const alivePlayers = Object.values(gameState.players).filter(p => p.isAlive);
+  const readyCount = alivePlayers.filter(p => gameState.shopReady?.[p.id]).length;
+  const totalCount = alivePlayers.length;
 
   return (
     <div className={styles.container}>
@@ -107,12 +112,41 @@ export default function MapAndShop({ gameState, myId, onSelectMap, onBuyItem, on
               )}
             </div>
 
-            <button
-              className={isVictoryShop ? styles.nextMapBtn : styles.startBtn}
-              onClick={isVictoryShop ? onProceedToNextMap : isMidCombatShop ? onContinueCombat : onStartCombat}
-            >
-              {isVictoryShop ? (nextMap ? `➡️ Ir para ${nextMap.name}` : '🌟 Fim de Jogo') : isMidCombatShop ? '⚔️ Continuar Combate!' : '⚔️ Iniciar Combate!'}
-            </button>
+            <div className={styles.readySection}>
+              {/* Per-player ready status */}
+              <div className={styles.readyList}>
+                {alivePlayers.map(p => (
+                  <div key={p.id} className={styles.readyChip}>
+                    <span>{CLASSES[p.classType].emoji}</span>
+                    <span>{p.name}</span>
+                    {gameState.shopReady?.[p.id]
+                      ? <span className={styles.readyDot}>✅</span>
+                      : <span className={styles.notReadyDot}>⌛</span>}
+                  </div>
+                ))}
+              </div>
+
+              <div className={styles.readyCounter}>
+                {readyCount}/{totalCount} prontos
+              </div>
+
+              {phase === 'map_selection' ? (
+                <button className={styles.startBtn} onClick={onStartCombat}>
+                  ⚔️ Iniciar Combate!
+                </button>
+              ) : (
+                <button
+                  className={amIReady ? styles.cancelReadyBtn : styles.readyBtn}
+                  onClick={onShopReady}
+                >
+                  {amIReady
+                    ? '❌ Cancelar Pronto'
+                    : isVictoryShop
+                      ? `➡️ Pronto para ${nextMap ? nextMap.name : 'Fim de Jogo'}!`
+                      : '⚔️ Pronto para Combate!'}
+                </button>
+              )}
+            </div>
           </div>
 
           <div className={styles.shopLayout}>
@@ -120,7 +154,8 @@ export default function MapAndShop({ gameState, myId, onSelectMap, onBuyItem, on
               <h3 className={styles.shopSubtitle}>Equipamentos Disponíveis</h3>
               <div className={styles.itemGrid}>
                 {SHOP_ITEMS.map(item => {
-                  const alreadyOwned = myPlayer?.inventory.some(i => i.id === item.id);
+                  const ownedItem = myPlayer?.inventory.find(i => i.id === item.id);
+                  const alreadyOwned = !item.consumable && !!ownedItem;
                   const canAfford = (myPlayer?.coins ?? 0) >= item.price;
 
                   return (
@@ -130,21 +165,27 @@ export default function MapAndShop({ gameState, myId, onSelectMap, onBuyItem, on
                     >
                       <div className={styles.itemEmoji}>{item.emoji}</div>
                       <div className={styles.itemInfo}>
-                        <div className={styles.itemName}>{item.name}</div>
+                        <div className={styles.itemName}>
+                          {item.name}
+                          {item.consumable && <span className={styles.consumableBadge}>consumível</span>}
+                        </div>
                         <div className={styles.itemDesc}>{item.description}</div>
                       </div>
                       <div className={styles.itemActions}>
                         <div className={styles.itemPrice}>💰 {item.price}</div>
                         {alreadyOwned ? (
-                          <span className={styles.ownedBadge}>Comprado</span>
+                          <span className={styles.ownedBadge}>Equipado</span>
                         ) : (
                           <button
                             className={styles.buyBtn}
                             onClick={() => onBuyItem(item.id)}
                             disabled={!canAfford}
                           >
-                            Comprar
+                            {item.consumable && ownedItem ? `+${item.quantity ?? 1}` : 'Comprar'}
                           </button>
+                        )}
+                        {item.consumable && ownedItem && (
+                          <span className={styles.qtyBadge}>x{ownedItem.quantity}</span>
                         )}
                       </div>
                     </div>

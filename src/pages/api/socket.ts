@@ -13,6 +13,7 @@ import {
   continueCombat,
   processPlayerAction,
   proceedToNextMap,
+  toggleShopReady,
   saveRoom,
   resetRoom,
 } from '@/lib/gameEngine';
@@ -111,6 +112,14 @@ export default function handler(req: NextApiRequest, res: NextApiResponseWithSoc
     socket.on('player_action', (action: { type: string; targetId?: string; skillIndex?: number; itemId?: string }) => {
       let state = getOrCreateRoom(ROOM_ID);
       state = processPlayerAction(state, socket.id, action);
+      saveRoom(state);
+      io.to(ROOM_ID).emit('game_state', state);
+    });
+
+    // Toggle ready status in shop — auto-advances when all ready
+    socket.on('shop_ready', () => {
+      let state = getOrCreateRoom(ROOM_ID);
+      state = toggleShopReady(state, socket.id);
       saveRoom(state);
       io.to(ROOM_ID).emit('game_state', state);
     });

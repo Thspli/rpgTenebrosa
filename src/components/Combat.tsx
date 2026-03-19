@@ -22,6 +22,12 @@ export default function Combat({ gameState, myId, onAction, onReset }: Props) {
   const canAct = myPlayer?.isAlive && isMyTurn && gameState.phase === 'combat';
   const aliveMonsters = gameState.currentMonsters.filter(m => m.hp > 0);
   const activePlayer = gameState.activePlayerId ? gameState.players[gameState.activePlayerId] : null;
+  const myPotions = myPlayer?.inventory.filter(i => i.consumable && (i.quantity ?? 0) > 0) ?? [];
+
+  function handleUsePotion(itemId: string) {
+    if (!canAct) return;
+    onAction({ type: 'use_potion', itemId });
+  }
 
   function handleAttack() {
     if (!canAct || !selectedTarget) return;
@@ -147,21 +153,39 @@ export default function Combat({ gameState, myId, onAction, onReset }: Props) {
                   ⚔️ Atacar
                 </button>
 
+                {/* Potions */}
+                {myPotions.length > 0 && (
+                  <div className={styles.potionRow}>
+                    {myPotions.map(potion => (
+                      <button
+                        key={potion.id}
+                        className={styles.potionBtn}
+                        onClick={() => handleUsePotion(potion.id)}
+                        title={potion.description}
+                      >
+                        {potion.emoji} {potion.name}
+                        <span className={styles.potionQty}>x{potion.quantity}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
                 <div className={styles.skillGrid}>
                   {SKILLS[myPlayer.classType].map((skill, i) => {
                     const mpCost = Math.ceil(skill.mpCost * (mapDef?.manaCostMultiplier ?? 1));
                     const canUse = myPlayer.mp >= mpCost;
+                    const isSpecial = i >= 3;
                     return (
                       <button
                         key={i}
-                        className={`${styles.skillBtn} ${i === 3 ? styles.specialBtn : ''} ${selectedSkillIndex === i ? styles.skillSelected : ''}`}
+                        className={`${styles.skillBtn} ${isSpecial ? styles.specialBtn : ''} ${selectedSkillIndex === i ? styles.skillSelected : ''}`}
                         onClick={() => setSelectedSkillIndex(selectedSkillIndex === i ? null : i)}
                         disabled={!canUse}
                         title={`${skill.description} (${mpCost} MP)`}
                       >
                         <span className={styles.skillEmoji}>{skill.emoji}</span>
                         <span className={styles.skillName}>{skill.name}</span>
-                        <span className={styles.skillMp}>{mpCost}MP</span>
+                        {mpCost > 0 && <span className={styles.skillMp}>{mpCost}MP</span>}
                       </button>
                     );
                   })}

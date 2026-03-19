@@ -192,6 +192,103 @@
   box-shadow: 0 0 20px rgba(39,174,96,0.4);
 }
 
+.readySection {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  min-width: 200px;
+}
+
+.readyList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-end;
+}
+
+.readyChip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-dim);
+  border-radius: 20px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.readyDot { font-size: 14px; }
+.notReadyDot { font-size: 14px; opacity: 0.5; }
+
+.readyCounter {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.readyBtn {
+  padding: 14px 28px;
+  background: linear-gradient(135deg, #1a6b2a, #27ae60);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-transform: uppercase;
+}
+
+.readyBtn:hover {
+  background: linear-gradient(135deg, #27ae60, #2ecc71);
+  transform: translateY(-1px);
+  box-shadow: 0 0 20px rgba(39,174,96,0.4);
+}
+
+.cancelReadyBtn {
+  padding: 14px 28px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-mid);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.cancelReadyBtn:hover {
+  border-color: var(--accent-red);
+  color: var(--accent-red-bright);
+}
+
+.nextMapBtn {
+  padding: 14px 28px;
+  background: linear-gradient(135deg, #1a6b2a, #27ae60);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-transform: uppercase;
+}
+
+.nextMapBtn:hover {
+  background: linear-gradient(135deg, #27ae60, #2ecc71);
+  transform: translateY(-1px);
+  box-shadow: 0 0 20px rgba(39,174,96,0.4);
+}
+
 .startBtn {
   padding: 14px 28px;
   background: linear-gradient(135deg, #8b2020, #c0392b);
@@ -300,6 +397,29 @@
 
 .buyBtn:hover:not(:disabled) { background: linear-gradient(135deg, #d4a017, #f0c040); }
 .buyBtn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.consumableBadge {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  padding: 1px 5px;
+  background: rgba(39,174,96,0.15);
+  border: 1px solid rgba(39,174,96,0.3);
+  color: var(--accent-green-bright);
+  border-radius: 3px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.qtyBadge {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  padding: 2px 7px;
+  background: rgba(39,174,96,0.15);
+  border: 1px solid rgba(39,174,96,0.3);
+  color: var(--accent-green-bright);
+  border-radius: 4px;
+  text-align: center;
+}
 
 .ownedBadge {
   font-family: var(--font-ui);

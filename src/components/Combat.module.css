@@ -323,6 +323,41 @@
   border: 1px solid rgba(231,76,60,0.2);
 }
 
+.potionRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.potionBtn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 12px;
+  background: rgba(39,174,96,0.12);
+  border: 1px solid rgba(39,174,96,0.4);
+  border-radius: 7px;
+  color: var(--accent-green-bright);
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-size: 13px;
+  transition: all 0.15s;
+}
+
+.potionBtn:hover {
+  background: rgba(39,174,96,0.25);
+  border-color: var(--accent-green-bright);
+  transform: translateY(-1px);
+}
+
+.potionQty {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  background: rgba(39,174,96,0.2);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
 .attackBtn {
   padding: 12px;
   background: linear-gradient(135deg, #7b1515, #c0392b);
