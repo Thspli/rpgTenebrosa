@@ -51,6 +51,7 @@ export default function GamePage() {
         onSelectMap={(mapId: MapId) => emit('select_map', { mapId })}
         onBuyItem={(itemId: string) => emit('buy_item', { itemId })}
         onStartCombat={() => emit('start_combat')}
+        onContinueCombat={() => emit('continue_combat')}
       />
     );
   }
