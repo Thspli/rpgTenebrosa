@@ -21,22 +21,25 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 20px;
+  padding: 10px 20px;
   background: var(--bg-panel);
   border-bottom: 1px solid var(--border-dim);
   position: relative;
   z-index: 1;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .headerLeft {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .mapName {
   font-family: var(--font-display);
-  font-size: 16px;
+  font-size: 15px;
   color: var(--text-gold);
   letter-spacing: 0.08em;
 }
@@ -50,10 +53,41 @@
   border-radius: 12px;
 }
 
+.wave {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: var(--accent-blue-bright);
+  background: rgba(52,152,219,0.1);
+  padding: 3px 10px;
+  border-radius: 12px;
+}
+
 .headerRight {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.activeTurnBadge {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  padding: 3px 12px;
+  background: rgba(212,160,23,0.2);
+  border: 1px solid var(--accent-gold);
+  color: var(--accent-gold-bright);
+  border-radius: 10px;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.shopCountdown {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  padding: 3px 10px;
+  background: rgba(39,174,96,0.1);
+  border: 1px solid rgba(39,174,96,0.3);
+  color: var(--accent-green-bright);
+  border-radius: 10px;
 }
 
 .debuffBadge {
@@ -117,7 +151,7 @@
   padding: 16px;
   cursor: pointer;
   transition: all 0.2s;
-  min-width: 140px;
+  min-width: 130px;
   text-align: center;
   animation: fadeIn 0.4s ease;
 }
@@ -161,26 +195,9 @@
   letter-spacing: 0.1em;
 }
 
-.monsterEmoji {
-  font-size: 36px;
-  margin-bottom: 6px;
-  display: block;
-}
-
-.monsterName {
-  font-family: var(--font-display);
-  font-size: 13px;
-  color: var(--text-primary);
-  margin-bottom: 2px;
-  letter-spacing: 0.04em;
-}
-
-.monsterLv {
-  font-family: var(--font-ui);
-  font-size: 11px;
-  color: var(--text-secondary);
-  margin-bottom: 8px;
-}
+.monsterEmoji  { font-size: 36px; margin-bottom: 6px; display: block; }
+.monsterName   { font-family: var(--font-display); font-size: 13px; color: var(--text-primary); margin-bottom: 2px; letter-spacing: 0.04em; }
+.monsterLv     { font-family: var(--font-ui); font-size: 11px; color: var(--text-secondary); margin-bottom: 8px; }
 
 .monsterHpTrack {
   height: 6px;
@@ -190,24 +207,9 @@
   margin-bottom: 4px;
 }
 
-.monsterHpFill {
-  height: 100%;
-  border-radius: 3px;
-  transition: width 0.4s ease, background 0.3s;
-}
-
-.monsterHpText {
-  font-family: var(--font-ui);
-  font-size: 11px;
-  color: var(--text-secondary);
-  margin-bottom: 6px;
-}
-
-.monsterStats {
-  font-family: var(--font-ui);
-  font-size: 12px;
-  color: var(--text-dim);
-}
+.monsterHpFill { height: 100%; border-radius: 3px; transition: width 0.4s ease, background 0.3s; }
+.monsterHpText { font-family: var(--font-ui); font-size: 11px; color: var(--text-secondary); margin-bottom: 6px; }
+.monsterStats  { font-family: var(--font-ui); font-size: 12px; color: var(--text-dim); }
 
 /* Action panel */
 .actionPanel {
@@ -216,7 +218,6 @@
   flex-direction: column;
   gap: 14px;
   overflow-y: auto;
-  border-right: 1px solid var(--border-dim);
 }
 
 .myStatus {
@@ -224,6 +225,12 @@
   border: 1px solid var(--border-dim);
   border-radius: 10px;
   padding: 14px;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.myStatusActive {
+  border-color: var(--accent-gold) !important;
+  box-shadow: 0 0 0 1px rgba(212,160,23,0.3), var(--glow-gold);
 }
 
 .myNameRow {
@@ -231,24 +238,12 @@
   align-items: center;
   gap: 8px;
   margin-bottom: 10px;
+  flex-wrap: wrap;
 }
 
-.myEmoji { font-size: 20px; }
-.myName {
-  font-family: var(--font-display);
-  font-size: 15px;
-  color: var(--text-primary);
-  flex: 1;
-  letter-spacing: 0.04em;
-}
-.myLevel {
-  font-family: var(--font-ui);
-  font-size: 11px;
-  color: var(--text-secondary);
-  background: var(--bg-dark);
-  padding: 2px 6px;
-  border-radius: 4px;
-}
+.myEmoji  { font-size: 20px; }
+.myName   { font-family: var(--font-display); font-size: 15px; color: var(--text-primary); flex: 1; letter-spacing: 0.04em; }
+.myLevel  { font-family: var(--font-ui); font-size: 11px; color: var(--text-secondary); background: var(--bg-dark); padding: 2px 6px; border-radius: 4px; }
 
 .deadBadge {
   font-size: 12px;
@@ -258,13 +253,23 @@
   border-radius: 4px;
 }
 
-.waitingBadge {
+.yourTurnBadge {
   font-size: 12px;
+  font-weight: 700;
+  color: var(--accent-gold-bright);
+  background: rgba(212,160,23,0.15);
+  border: 1px solid rgba(212,160,23,0.4);
+  padding: 2px 8px;
+  border-radius: 4px;
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+.waitingBadge {
+  font-size: 11px;
   color: var(--text-secondary);
   background: var(--bg-dark);
   padding: 2px 8px;
   border-radius: 4px;
-  animation: pulse 2s ease-in-out infinite;
 }
 
 .statBarRow {
@@ -274,12 +279,7 @@
   margin-bottom: 6px;
 }
 
-.barLabel {
-  font-family: var(--font-ui);
-  font-size: 11px;
-  color: var(--text-dim);
-  width: 22px;
-}
+.barLabel { font-family: var(--font-ui); font-size: 11px; color: var(--text-dim); width: 22px; }
 
 .barTrack {
   flex: 1;
@@ -289,48 +289,29 @@
   overflow: hidden;
 }
 
-.barFill {
-  height: 100%;
-  border-radius: 4px;
-  transition: width 0.4s ease;
-}
+.barFill   { height: 100%; border-radius: 4px; transition: width 0.4s ease; }
+.barText   { font-family: var(--font-ui); font-size: 11px; color: var(--text-secondary); min-width: 55px; text-align: right; }
 
-.barText {
-  font-family: var(--font-ui);
-  font-size: 11px;
-  color: var(--text-secondary);
-  min-width: 55px;
-  text-align: right;
-}
-
-.xpBar {
-  height: 3px;
-  background: var(--bg-dark);
-  border-radius: 2px;
-  overflow: hidden;
-  margin-top: 6px;
-}
-
-.xpFill {
-  height: 100%;
-  background: var(--xp-color);
-  border-radius: 2px;
-  transition: width 0.4s ease;
-}
-
-.xpText {
-  font-family: var(--font-ui);
-  font-size: 10px;
-  color: var(--text-dim);
-  text-align: right;
-  margin-top: 2px;
-}
+.xpBar   { height: 3px; background: var(--bg-dark); border-radius: 2px; overflow: hidden; margin-top: 6px; }
+.xpFill  { height: 100%; background: var(--xp-color); border-radius: 2px; transition: width 0.4s ease; }
+.xpText  { font-family: var(--font-ui); font-size: 10px; color: var(--text-dim); text-align: right; margin-top: 2px; }
 
 /* Actions */
 .actions {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.waitingPanel {
+  background: var(--bg-dark);
+  border: 1px solid var(--border-dim);
+  border-radius: 8px;
+  padding: 14px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 14px;
+  animation: pulse 2s ease-in-out infinite;
 }
 
 .targetInfo {
@@ -363,11 +344,7 @@
 
 .attackBtn:disabled { opacity: 0.35; cursor: not-allowed; }
 
-.skillGrid {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
+.skillGrid { display: flex; flex-direction: column; gap: 6px; }
 
 .skillBtn {
   display: flex;
@@ -411,15 +388,8 @@
 }
 
 .skillEmoji { font-size: 16px; }
-.skillName { flex: 1; }
-.skillMp {
-  font-family: var(--font-ui);
-  font-size: 11px;
-  color: var(--mp-color);
-  background: rgba(52,152,219,0.1);
-  padding: 2px 6px;
-  border-radius: 3px;
-}
+.skillName  { flex: 1; }
+.skillMp    { font-family: var(--font-ui); font-size: 11px; color: var(--mp-color); background: rgba(52,152,219,0.1); padding: 2px 6px; border-radius: 3px; }
 
 .useSkillBtn {
   padding: 10px;
@@ -435,18 +405,14 @@
   letter-spacing: 0.06em;
 }
 
-.useSkillBtn:hover:not(:disabled) {
-  filter: brightness(1.15);
-  box-shadow: var(--glow-blue);
-}
-
+.useSkillBtn:hover:not(:disabled) { filter: brightness(1.15); box-shadow: var(--glow-blue); }
 .useSkillBtn:disabled { opacity: 0.3; cursor: not-allowed; }
 
 /* Players row */
 .playersRow {
   display: flex;
   gap: 10px;
-  padding: 12px 20px;
+  padding: 10px 20px;
   background: var(--bg-panel);
   border-top: 1px solid var(--border-dim);
   overflow-x: auto;
@@ -455,17 +421,20 @@
 }
 
 .playerMini {
-  min-width: 160px;
+  min-width: 150px;
   background: var(--bg-card);
   border: 1px solid var(--border-dim);
   border-radius: 8px;
   padding: 10px 12px;
+  transition: border-color 0.3s, box-shadow 0.3s;
 }
 
-.deadPlayer {
-  opacity: 0.35;
-  filter: grayscale(0.8);
+.activePlayer {
+  border-color: var(--accent-gold) !important;
+  box-shadow: 0 0 0 1px rgba(212,160,23,0.25);
 }
+
+.deadPlayer { opacity: 0.35; filter: grayscale(0.8); }
 
 .miniHeader {
   display: flex;
@@ -493,12 +462,13 @@
   border-radius: 3px;
 }
 
-.actedDot {
-  width: 7px;
-  height: 7px;
+.activeDot {
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
-  background: var(--accent-green-bright);
-  box-shadow: 0 0 5px var(--accent-green-bright);
+  background: var(--accent-gold-bright);
+  box-shadow: 0 0 6px var(--accent-gold-bright);
+  animation: pulse 1.2s ease-in-out infinite;
 }
 
 .smallBarTrack {
@@ -553,12 +523,7 @@
   animation: slideInRight 0.2s ease;
 }
 
-.logTurn {
-  font-family: var(--font-ui);
-  font-size: 10px;
-  color: var(--text-dim);
-  margin-right: 4px;
-}
+.logTurn { font-family: var(--font-ui); font-size: 10px; color: var(--text-dim); margin-right: 4px; }
 
 .log_player_action { color: #a8d8ea; }
 .log_monster_action { color: #f4a261; }
@@ -587,26 +552,9 @@
   box-shadow: var(--shadow-lg);
 }
 
-.endIcon {
-  font-size: 64px;
-  margin-bottom: 16px;
-  display: block;
-  animation: dmgPop 0.5s ease;
-}
-
-.endTitle {
-  font-size: 36px;
-  color: var(--text-gold);
-  margin-bottom: 12px;
-  letter-spacing: 0.15em;
-}
-
-.endSubtitle {
-  color: var(--text-secondary);
-  font-size: 16px;
-  margin-bottom: 24px;
-  line-height: 1.6;
-}
+.endIcon  { font-size: 64px; margin-bottom: 16px; display: block; animation: dmgPop 0.5s ease; }
+.endTitle { font-size: 36px; color: var(--text-gold); margin-bottom: 12px; letter-spacing: 0.15em; }
+.endSubtitle { color: var(--text-secondary); font-size: 16px; margin-bottom: 24px; line-height: 1.6; }
 
 .endLog {
   text-align: left;

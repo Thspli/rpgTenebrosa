@@ -15,11 +15,13 @@ interface Props {
 export default function Combat({ gameState, myId, onAction, onReset }: Props) {
   const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
   const [selectedSkillIndex, setSelectedSkillIndex] = useState<number | null>(null);
+
   const myPlayer = gameState.players[myId];
   const mapDef = MAPS.find(m => m.id === gameState.currentMap);
-  const hasActed = !!gameState.actionsThisTurn[myId];
-  const canAct = myPlayer?.isAlive && !hasActed && gameState.phase === 'combat';
+  const isMyTurn = gameState.activePlayerId === myId;
+  const canAct = myPlayer?.isAlive && isMyTurn && gameState.phase === 'combat';
   const aliveMonsters = gameState.currentMonsters.filter(m => m.hp > 0);
+  const activePlayer = gameState.activePlayerId ? gameState.players[gameState.activePlayerId] : null;
 
   function handleAttack() {
     if (!canAct || !selectedTarget) return;
@@ -30,7 +32,7 @@ export default function Combat({ gameState, myId, onAction, onReset }: Props) {
   function handleSkill() {
     if (!canAct || selectedSkillIndex === null) return;
     const skill = SKILLS[myPlayer!.classType][selectedSkillIndex];
-    const needsTarget = skill.damage && selectedSkillIndex !== 3;
+    const needsTarget = skill.damage !== undefined && selectedSkillIndex !== 3;
     if (needsTarget && !selectedTarget) return;
     onAction({ type: 'skill', skillIndex: selectedSkillIndex, targetId: selectedTarget ?? undefined });
     setSelectedTarget(null);
@@ -70,10 +72,22 @@ export default function Combat({ gameState, myId, onAction, onReset }: Props) {
         <div className={styles.headerLeft}>
           <span className={styles.mapName}>{mapDef?.theme} {mapDef?.name}</span>
           <span className={styles.turn}>Turno {gameState.turn}</span>
+          <span className={styles.wave}>Onda {gameState.waveNumber}</span>
         </div>
         <div className={styles.headerRight}>
-          {mapDef?.defenseDebuff! > 0 && <span className={styles.debuffBadge}>🛡️ -20% DEF</span>}
-          {mapDef?.manaCostMultiplier! > 1 && <span className={styles.debuffBadge}>💎 MANA x2</span>}
+          {/* Active player indicator */}
+          {activePlayer && (
+            <span className={styles.activeTurnBadge}>
+              🎯 Vez de: {activePlayer.name} {CLASSES[activePlayer.classType].emoji}
+            </span>
+          )}
+          {mapDef?.defenseDebuff! > 0 && (
+            <span className={styles.debuffBadge}>🛡️ -{mapDef!.defenseDebuff * 100}% DEF</span>
+          )}
+          {mapDef?.manaCostMultiplier! > 1 && (
+            <span className={styles.debuffBadge}>💎 MANA x{mapDef!.manaCostMultiplier}</span>
+          )}
+          <span className={styles.shopCountdown}>🛒 Loja em: {gameState.shopCountdown} turno{gameState.shopCountdown !== 1 ? 's' : ''}</span>
           <span className={styles.coins}>💰 {gameState.groupCoins}</span>
         </div>
       </div>
@@ -89,7 +103,7 @@ export default function Combat({ gameState, myId, onAction, onReset }: Props) {
                 key={monster.id}
                 monster={monster}
                 isSelected={selectedTarget === monster.id}
-                onClick={() => setSelectedTarget(selectedTarget === monster.id ? null : monster.id)}
+                onClick={() => monster.hp > 0 && setSelectedTarget(selectedTarget === monster.id ? null : monster.id)}
                 isDead={monster.hp <= 0}
               />
             ))}
@@ -99,13 +113,16 @@ export default function Combat({ gameState, myId, onAction, onReset }: Props) {
         {/* Action Panel */}
         {myPlayer && (
           <div className={styles.actionPanel}>
-            <div className={styles.myStatus}>
+            <div className={`${styles.myStatus} ${isMyTurn ? styles.myStatusActive : ''}`}>
               <div className={styles.myNameRow}>
                 <span className={styles.myEmoji}>{CLASSES[myPlayer.classType].emoji}</span>
                 <span className={styles.myName}>{myPlayer.name}</span>
                 <span className={styles.myLevel}>Nv.{myPlayer.level}</span>
                 {!myPlayer.isAlive && <span className={styles.deadBadge}>💀 Derrotado</span>}
-                {hasActed && myPlayer.isAlive && <span className={styles.waitingBadge}>⌛ Aguardando</span>}
+                {isMyTurn && myPlayer.isAlive && <span className={styles.yourTurnBadge}>⚡ SUA VEZ!</span>}
+                {!isMyTurn && myPlayer.isAlive && activePlayer && (
+                  <span className={styles.waitingBadge}>⌛ Vez de {activePlayer.name}</span>
+                )}
               </div>
               <StatBar value={myPlayer.hp} max={myPlayer.maxHp} color="var(--hp-color)" label="HP" />
               <StatBar value={myPlayer.mp} max={myPlayer.maxMp} color="var(--mp-color)" label="MP" />
@@ -119,7 +136,7 @@ export default function Combat({ gameState, myId, onAction, onReset }: Props) {
               <div className={styles.actions}>
                 {selectedTarget && (
                   <div className={styles.targetInfo}>
-                    🎯 Alvo: {gameState.currentMonsters.find(m => m.id === selectedTarget)?.name ??
+                    🎯 Alvo: {aliveMonsters.find(m => m.id === selectedTarget)?.name ??
                       gameState.players[selectedTarget]?.name}
                   </div>
                 )}
@@ -140,9 +157,7 @@ export default function Combat({ gameState, myId, onAction, onReset }: Props) {
                       <button
                         key={i}
                         className={`${styles.skillBtn} ${i === 3 ? styles.specialBtn : ''} ${selectedSkillIndex === i ? styles.skillSelected : ''}`}
-                        onClick={() => {
-                          setSelectedSkillIndex(selectedSkillIndex === i ? null : i);
-                        }}
+                        onClick={() => setSelectedSkillIndex(selectedSkillIndex === i ? null : i)}
                         disabled={!canUse}
                         title={`${skill.description} (${mpCost} MP)`}
                       >
@@ -158,16 +173,16 @@ export default function Combat({ gameState, myId, onAction, onReset }: Props) {
                   <button
                     className={styles.useSkillBtn}
                     onClick={handleSkill}
-                    disabled={
-                      selectedSkillIndex === null ||
-                      (SKILLS[myPlayer.classType][selectedSkillIndex].damage !== undefined &&
-                       selectedSkillIndex !== 3 &&
-                       !(gameState.phase === 'combat') && !selectedTarget)
-                    }
                   >
                     ✨ Usar: {SKILLS[myPlayer.classType][selectedSkillIndex]?.name}
                   </button>
                 )}
+              </div>
+            )}
+
+            {!canAct && myPlayer.isAlive && !isMyTurn && activePlayer && (
+              <div className={styles.waitingPanel}>
+                <p>⌛ Aguardando <strong>{activePlayer.name}</strong> agir...</p>
               </div>
             )}
           </div>
@@ -179,14 +194,17 @@ export default function Combat({ gameState, myId, onAction, onReset }: Props) {
         {gameState.playerOrder.map(pid => {
           const p = gameState.players[pid];
           if (!p) return null;
-          const acted = !!gameState.actionsThisTurn[pid];
+          const isActive = gameState.activePlayerId === pid;
           return (
-            <div key={pid} className={`${styles.playerMini} ${!p.isAlive ? styles.deadPlayer : ''}`}>
+            <div
+              key={pid}
+              className={`${styles.playerMini} ${!p.isAlive ? styles.deadPlayer : ''} ${isActive ? styles.activePlayer : ''}`}
+            >
               <div className={styles.miniHeader}>
                 <span>{CLASSES[p.classType].emoji}</span>
                 <span className={styles.miniName}>{p.name}</span>
                 {pid === myId && <span className={styles.youTag}>você</span>}
-                {acted && p.isAlive && <span className={styles.actedDot} title="Agiu" />}
+                {isActive && p.isAlive && <span className={styles.activeDot} title="Vez dele" />}
                 {!p.isAlive && <span>💀</span>}
               </div>
               <SmallBar value={p.hp} max={p.maxHp} color="var(--hp-color)" />
@@ -211,7 +229,9 @@ export default function Combat({ gameState, myId, onAction, onReset }: Props) {
   );
 }
 
-function MonsterCard({ monster, isSelected, onClick, isDead }: { monster: Monster; isSelected: boolean; onClick: () => void; isDead: boolean }) {
+function MonsterCard({ monster, isSelected, onClick, isDead }: {
+  monster: Monster; isSelected: boolean; onClick: () => void; isDead: boolean;
+}) {
   const hpPct = (monster.hp / monster.maxHp) * 100;
   return (
     <div

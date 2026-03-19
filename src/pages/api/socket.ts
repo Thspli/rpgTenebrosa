@@ -10,6 +10,7 @@ import {
   selectMap,
   buyItem,
   startCombat,
+  continueCombat,
   processPlayerAction,
   saveRoom,
   resetRoom,
@@ -51,7 +52,6 @@ export default function handler(req: NextApiRequest, res: NextApiResponseWithSoc
 
     socket.join(ROOM_ID);
 
-    // Send current state on connect
     const state = getOrCreateRoom(ROOM_ID);
     socket.emit('game_state', state);
 
@@ -99,6 +99,14 @@ export default function handler(req: NextApiRequest, res: NextApiResponseWithSoc
       io.to(ROOM_ID).emit('game_state', state);
     });
 
+    // Resume combat after a mid-battle shop break
+    socket.on('continue_combat', () => {
+      let state = getOrCreateRoom(ROOM_ID);
+      state = continueCombat(state);
+      saveRoom(state);
+      io.to(ROOM_ID).emit('game_state', state);
+    });
+
     socket.on('player_action', (action: { type: string; targetId?: string; skillIndex?: number; itemId?: string }) => {
       let state = getOrCreateRoom(ROOM_ID);
       state = processPlayerAction(state, socket.id, action);
@@ -122,6 +130,11 @@ export default function handler(req: NextApiRequest, res: NextApiResponseWithSoc
         delete state.actionsThisTurn[socket.id];
         if (Object.keys(state.players).length === 0) {
           state.phase = 'lobby';
+        }
+        // If it was this player's turn, advance
+        if (state.activePlayerId === socket.id) {
+          const nextAlive = state.playerOrder.find(pid => state.players[pid]?.isAlive && !state.actionsThisTurn[pid]);
+          state.activePlayerId = nextAlive ?? null;
         }
         state.combatLog.push({
           id: Math.random().toString(),

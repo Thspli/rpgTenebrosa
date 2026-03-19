@@ -1,6 +1,6 @@
 export type ClassType = 'warrior' | 'mage' | 'rogue' | 'necromancer' | 'paladin' | 'ranger';
 
-export type MapId = 1 | 2 | 3;
+export type MapId = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
 export interface ClassDefinition {
   name: string;
@@ -25,6 +25,8 @@ export interface Item {
   price: number;
   attackBonus: number;
   defenseBonus: number;
+  hpBonus?: number;
+  mpBonus?: number;
   description: string;
 }
 
@@ -76,7 +78,7 @@ export interface MapDefinition {
   name: string;
   theme: string;
   description: string;
-  difficulty: 'Iniciante' | 'Intermediário' | 'Avançado';
+  difficulty: 'Iniciante' | 'Intermediário' | 'Avançado' | 'Épico' | 'Lendário';
   defenseDebuff: number;
   manaCostMultiplier: number;
   monsters: Monster[];
@@ -110,6 +112,7 @@ export interface GameState {
   players: Record<string, Player>;
   playerOrder: string[];
   currentPlayerIndex: number;
+  activePlayerId: string | null; // whose turn it is right now
   currentMap: MapId;
   currentMonsters: Monster[];
   turn: number;
@@ -120,6 +123,9 @@ export interface GameState {
   unlockedClasses: ClassType[];
   actionsThisTurn: Record<string, boolean>;
   shopItems: Item[];
+  bossDefeated: boolean;
+  waveNumber: number; // track waves within a map
+  shopCountdown: number; // turns until next shop break
 }
 
 export type SocketEvent =

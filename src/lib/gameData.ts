@@ -122,11 +122,30 @@ export const MAPS: MapDefinition[] = [
       makeMonster('wolf', 'Lobo Selvagem', '🐺', 1, 25, 5, 2, 12, 4),
       makeMonster('slime', 'Gosma Verde', '🟢', 1, 20, 3, 0, 10, 3),
       makeMonster('spider', 'Aranha Gigante', '🕷️', 1, 28, 4, 1, 14, 4),
+      makeMonster('bandit', 'Bandido', '🪓', 1, 32, 5, 1, 16, 6),
     ],
-    boss: makeMonster('troll', 'Troll da Floresta', '👹', 1, 120, 8, 4, 80, 30, true),
+    boss: makeMonster('troll', 'Troll da Floresta', '👹', 2, 120, 8, 4, 80, 30, true),
   },
   {
     id: 2,
+    name: 'Pântano Maldito',
+    theme: '🌿',
+    description: 'Terrenos alagados com criaturas venenosas. Cuidado com os ataques de veneno!',
+    difficulty: 'Iniciante',
+    defenseDebuff: 0,
+    manaCostMultiplier: 1,
+    bgColor: '#1a2a10',
+    unlocked: false,
+    monsters: [
+      makeMonster('frog', 'Sapo Venenoso', '🐸', 2, 35, 6, 2, 20, 7),
+      makeMonster('snake', 'Serpente do Pântano', '🐍', 2, 30, 7, 1, 18, 6),
+      makeMonster('mushroom', 'Cogumelo Tóxico', '🍄', 2, 40, 4, 3, 22, 8),
+      makeMonster('lizard', 'Lagarto Gigante', '🦎', 2, 38, 6, 2, 21, 7),
+    ],
+    boss: makeMonster('hydra', 'Hidra do Pântano', '🐲', 3, 180, 10, 5, 120, 45, true),
+  },
+  {
+    id: 3,
     name: 'Cavernas de Pedra',
     theme: '🪨',
     description: 'Cavernas escuras com criaturas blindadas. Sua defesa é reduzida em 20%!',
@@ -140,14 +159,51 @@ export const MAPS: MapDefinition[] = [
       makeMonster('stone_golem_small', 'Mini Golem', '🪨', 5, 80, 9, 8, 45, 18),
       makeMonster('dark_elf', 'Elfo Sombrio', '🧝', 5, 60, 12, 4, 38, 14),
       makeMonster('cave_bat', 'Morcego Gigante', '🦇', 5, 55, 11, 3, 35, 12),
+      makeMonster('troll_cave', 'Troll das Cavernas', '👾', 5, 75, 11, 5, 42, 16),
     ],
-    boss: makeMonster('stone_golem', 'Golem de Pedra', '⛏️', 5, 250, 16, 12, 180, 70, true),
+    boss: makeMonster('stone_golem', 'Golem de Pedra', '⛏️', 6, 250, 16, 12, 180, 70, true),
   },
   {
-    id: 3,
+    id: 4,
+    name: 'Ruínas Amaldiçoadas',
+    theme: '🏚️',
+    description: 'Ruínas de uma civilização antiga. Fantasmas e mortos-vivos habitam estas paredes.',
+    difficulty: 'Intermediário',
+    defenseDebuff: 0.1,
+    manaCostMultiplier: 1,
+    bgColor: '#2a1a2f',
+    unlocked: false,
+    monsters: [
+      makeMonster('ghost', 'Fantasma', '👻', 7, 65, 13, 3, 50, 20),
+      makeMonster('skeleton', 'Esqueleto Guerreiro', '💀', 7, 80, 12, 6, 55, 22),
+      makeMonster('zombie', 'Zumbi Antigo', '🧟', 7, 90, 10, 5, 52, 21),
+      makeMonster('wraith', 'Espectro Sombrio', '🌑', 7, 70, 14, 4, 58, 23),
+    ],
+    boss: makeMonster('lich_king', 'Rei Lich', '☠️', 8, 320, 19, 10, 250, 95, true),
+  },
+  {
+    id: 5,
+    name: 'Vulcão Ardente',
+    theme: '🌋',
+    description: 'O calor intenso dobra o custo de mana! Criaturas de fogo dominam este lugar.',
+    difficulty: 'Avançado',
+    defenseDebuff: 0,
+    manaCostMultiplier: 2,
+    bgColor: '#2f1510',
+    unlocked: false,
+    monsters: [
+      makeMonster('fire_elemental', 'Elemental de Fogo', '🔥', 9, 100, 16, 7, 70, 28),
+      makeMonster('lava_golem', 'Golem de Lava', '🌋', 9, 120, 14, 10, 75, 30),
+      makeMonster('fire_drake', 'Drake Flamejante', '🐉', 9, 110, 17, 8, 72, 29),
+      makeMonster('ember_spirit', 'Espírito da Brasa', '✨', 9, 90, 18, 5, 68, 27),
+    ],
+    boss: makeMonster('fire_titan', 'Titã de Fogo', '🔴', 10, 400, 22, 14, 350, 140, true),
+  },
+  {
+    id: 6,
     name: 'Torre do Abismo',
     theme: '🏰',
-    description: 'A torre final. O custo de mana está dobrado. O Boss Final aguarda no topo!',
+    description: 'A torre sombria. O custo de mana está dobrado. Demônios guardam cada andar.',
     difficulty: 'Avançado',
     defenseDebuff: 0,
     manaCostMultiplier: 2,
@@ -157,8 +213,27 @@ export const MAPS: MapDefinition[] = [
       makeMonster('demon', 'Demônio Menor', '😈', 10, 140, 18, 10, 90, 35),
       makeMonster('lich', 'Lich', '💀', 10, 120, 20, 8, 95, 38),
       makeMonster('dragon_small', 'Draconato', '🐉', 10, 160, 17, 12, 100, 40),
+      makeMonster('dark_knight', 'Cavaleiro das Trevas', '🖤', 10, 150, 19, 11, 98, 39),
     ],
-    boss: makeMonster('demon_lord', 'Lorde Demoníaco', '👿', 10, 500, 25, 15, 500, 200, true),
+    boss: makeMonster('demon_lord', 'Lorde Demoníaco', '👿', 11, 500, 25, 15, 500, 200, true),
+  },
+  {
+    id: 7,
+    name: 'Reino dos Deuses Caídos',
+    theme: '⚡',
+    description: 'O desafio final. Defesa reduzida em 30% e mana custa o dobro. Apenas os mais fortes sobrevivem.',
+    difficulty: 'Lendário',
+    defenseDebuff: 0.3,
+    manaCostMultiplier: 2,
+    bgColor: '#1a1030',
+    unlocked: false,
+    monsters: [
+      makeMonster('fallen_angel', 'Anjo Caído', '🪽', 15, 200, 24, 14, 150, 60),
+      makeMonster('chaos_beast', 'Besta do Caos', '🌀', 15, 220, 22, 15, 155, 62),
+      makeMonster('void_reaper', 'Ceifador do Vazio', '🌑', 15, 190, 26, 12, 160, 64),
+      makeMonster('titan_spawn', 'Filhote de Titã', '👁️', 15, 210, 23, 16, 152, 61),
+    ],
+    boss: makeMonster('ancient_god', 'Deus Antigo Corrompido', '🌟', 20, 999, 35, 20, 1000, 400, true),
   },
 ];
 
@@ -169,13 +244,16 @@ export const SHOP_ITEMS: Item[] = [
   { id: 'dragon_scale', name: 'Escama de Dragão', emoji: '🐉', price: 80, attackBonus: 0, defenseBonus: 10, description: '+10 Defesa' },
   { id: 'enchanted_blade', name: 'Lâmina Encantada', emoji: '✨', price: 80, attackBonus: 10, defenseBonus: 0, description: '+10 Ataque' },
   { id: 'amulet', name: 'Amuleto da Sorte', emoji: '📿', price: 60, attackBonus: 4, defenseBonus: 4, description: '+4 Ataque e +4 Defesa' },
+  { id: 'mana_crystal', name: 'Cristal de Mana', emoji: '💎', price: 50, attackBonus: 0, defenseBonus: 0, mpBonus: 30, description: '+30 MP Máximo' },
+  { id: 'vitality_stone', name: 'Pedra da Vitalidade', emoji: '❤️', price: 50, attackBonus: 0, defenseBonus: 0, hpBonus: 30, description: '+30 HP Máximo' },
+  { id: 'titan_armor', name: 'Armadura de Titã', emoji: '🦺', price: 120, attackBonus: 2, defenseBonus: 15, description: '+2 Ataque e +15 Defesa' },
+  { id: 'void_blade', name: 'Lâmina do Vazio', emoji: '🌑', price: 120, attackBonus: 15, defenseBonus: 0, description: '+15 Ataque' },
 ];
 
 export const XP_PER_LEVEL = (level: number) => level * 100;
 
 export function getEffectiveDefense(player: Player, mapDef: MapDefinition): number {
-  const totalDefense = player.defense;
-  return Math.floor(totalDefense * (1 - mapDef.defenseDebuff));
+  return Math.floor(player.defense * (1 - mapDef.defenseDebuff));
 }
 
 import { Player } from './types';

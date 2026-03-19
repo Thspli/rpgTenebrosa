@@ -10,11 +10,13 @@ interface Props {
   onSelectMap: (mapId: MapId) => void;
   onBuyItem: (itemId: string) => void;
   onStartCombat: () => void;
+  onContinueCombat: () => void;
 }
 
-export default function MapAndShop({ gameState, myId, onSelectMap, onBuyItem, onStartCombat }: Props) {
+export default function MapAndShop({ gameState, myId, onSelectMap, onBuyItem, onStartCombat, onContinueCombat }: Props) {
   const myPlayer = gameState.players[myId];
   const phase = gameState.phase;
+  const isMidCombatShop = phase === 'shopping' && gameState.turn > 0;
 
   return (
     <div className={styles.container}>
@@ -37,7 +39,7 @@ export default function MapAndShop({ gameState, myId, onSelectMap, onBuyItem, on
 
                   <div className={styles.mapTheme}>{map.theme}</div>
                   <h3 className={styles.mapName}>{map.name}</h3>
-                  <span className={`${styles.diffBadge} ${styles['diff_' + map.difficulty.replace('é', 'e').replace('á', 'a').replace('â', 'a').toLowerCase()]}`}>
+                  <span className={`${styles.diffBadge} ${getDiffClass(map.difficulty, styles)}`}>
                     {map.difficulty}
                   </span>
                   <p className={styles.mapDesc}>{map.description}</p>
@@ -45,7 +47,7 @@ export default function MapAndShop({ gameState, myId, onSelectMap, onBuyItem, on
                   <div className={styles.mapEffects}>
                     {map.defenseDebuff > 0 && (
                       <div className={styles.effect + ' ' + styles.debuff}>
-                        🛡️ -20% Defesa
+                        🛡️ -{map.defenseDebuff * 100}% Defesa
                       </div>
                     )}
                     {map.manaCostMultiplier > 1 && (
@@ -70,15 +72,26 @@ export default function MapAndShop({ gameState, myId, onSelectMap, onBuyItem, on
         <div className={styles.shopSection}>
           <div className={styles.shopHeader}>
             <div>
-              <h2 className={styles.sectionTitle}>🛒 Loja do Aventureiro</h2>
+              <h2 className={styles.sectionTitle}>
+                {isMidCombatShop ? '⚔️ Pausa de Combate — Loja' : '🛒 Loja do Aventureiro'}
+              </h2>
               <p className={styles.hint}>
-                Mapa selecionado: {MAPS.find(m => m.id === gameState.currentMap)?.name} |
+                Mapa: {MAPS.find(m => m.id === gameState.currentMap)?.name} |
+                Turno: {gameState.turn} |
                 Moedas do grupo: <span className={styles.coins}>💰 {gameState.groupCoins}</span>
               </p>
+              {isMidCombatShop && (
+                <p className={styles.shopWarning}>
+                  ⚠️ Após a loja, o combate continua por mais 3 turnos antes da próxima pausa.
+                </p>
+              )}
             </div>
 
-            <button className={styles.startBtn} onClick={onStartCombat}>
-              ⚔️ Iniciar Combate!
+            <button
+              className={styles.startBtn}
+              onClick={isMidCombatShop ? onContinueCombat : onStartCombat}
+            >
+              {isMidCombatShop ? '⚔️ Continuar Combate!' : '⚔️ Iniciar Combate!'}
             </button>
           </div>
 
@@ -136,11 +149,11 @@ export default function MapAndShop({ gameState, myId, onSelectMap, onBuyItem, on
                   <div className={styles.statGrid}>
                     <div className={styles.statItem}>
                       <span className={styles.statIcon}>❤️</span>
-                      <span className={styles.statVal}>{myPlayer.maxHp} HP</span>
+                      <span className={styles.statVal}>{myPlayer.hp}/{myPlayer.maxHp} HP</span>
                     </div>
                     <div className={styles.statItem}>
                       <span className={styles.statIcon}>💎</span>
-                      <span className={styles.statVal}>{myPlayer.maxMp} MP</span>
+                      <span className={styles.statVal}>{myPlayer.mp}/{myPlayer.maxMp} MP</span>
                     </div>
                     <div className={styles.statItem}>
                       <span className={styles.statIcon}>⚔️</span>
@@ -174,6 +187,8 @@ export default function MapAndShop({ gameState, myId, onSelectMap, onBuyItem, on
                     <span>{CLASSES[p.classType].emoji}</span>
                     <span className={styles.memberName}>{p.name}</span>
                     <span className={styles.memberClass}>{CLASSES[p.classType].name}</span>
+                    <span style={{ fontSize: 12, color: 'var(--hp-color)' }}>❤️{p.hp}</span>
+                    <span style={{ fontSize: 12, color: 'var(--mp-color)' }}>💎{p.mp}</span>
                     {p.id === myId && <span className={styles.you}>você</span>}
                   </div>
                 ))}
@@ -184,4 +199,15 @@ export default function MapAndShop({ gameState, myId, onSelectMap, onBuyItem, on
       )}
     </div>
   );
+}
+
+function getDiffClass(difficulty: string, styles: Record<string, string>): string {
+  const map: Record<string, string> = {
+    'Iniciante': styles.diff_iniciante,
+    'Intermediário': styles.diff_intermediario,
+    'Avançado': styles.diff_avancado,
+    'Épico': styles.diff_epico,
+    'Lendário': styles.diff_lendario,
+  };
+  return map[difficulty] ?? '';
 }

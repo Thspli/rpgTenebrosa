@@ -15,7 +15,17 @@
   color: var(--text-secondary);
   font-size: 14px;
   font-style: italic;
-  margin-bottom: 24px;
+  margin-bottom: 8px;
+}
+
+.shopWarning {
+  color: #f39c12;
+  font-size: 13px;
+  background: rgba(243,156,18,0.1);
+  border: 1px solid rgba(243,156,18,0.3);
+  padding: 6px 12px;
+  border-radius: 6px;
+  margin-bottom: 8px;
 }
 
 .coins {
@@ -25,14 +35,14 @@
 
 /* Map Selection */
 .mapSection {
-  max-width: 900px;
+  max-width: 1100px;
   margin: 0 auto;
 }
 
 .mapGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
 }
 
 .mapCard {
@@ -40,7 +50,7 @@
   background: var(--bg-panel);
   border: 2px solid var(--border-dim);
   border-radius: 14px;
-  padding: 24px;
+  padding: 20px;
   cursor: pointer;
   transition: all 0.25s;
   overflow: hidden;
@@ -83,13 +93,13 @@
 }
 
 .mapTheme {
-  font-size: 40px;
-  margin-bottom: 12px;
+  font-size: 36px;
+  margin-bottom: 10px;
 }
 
 .mapName {
   font-family: var(--font-display);
-  font-size: 18px;
+  font-size: 16px;
   color: var(--text-primary);
   margin-bottom: 8px;
   letter-spacing: 0.06em;
@@ -107,15 +117,17 @@
   margin-bottom: 10px;
 }
 
-.diff_iniciante { background: rgba(39,174,96,0.2); color: var(--accent-green-bright); border: 1px solid var(--accent-green); }
-.diff_intermediario { background: rgba(243,156,18,0.2); color: #f39c12; border: 1px solid #e67e22; }
-.diff_avancado { background: rgba(231,76,60,0.2); color: var(--accent-red-bright); border: 1px solid var(--accent-red); }
+.diff_iniciante    { background: rgba(39,174,96,0.2);   color: var(--accent-green-bright); border: 1px solid var(--accent-green); }
+.diff_intermediario{ background: rgba(243,156,18,0.2);  color: #f39c12;                    border: 1px solid #e67e22; }
+.diff_avancado     { background: rgba(231,76,60,0.2);   color: var(--accent-red-bright);   border: 1px solid var(--accent-red); }
+.diff_epico        { background: rgba(155,89,182,0.2);  color: #9b59b6;                    border: 1px solid #8e44ad; }
+.diff_lendario     { background: rgba(212,160,23,0.2);  color: var(--accent-gold-bright);  border: 1px solid var(--accent-gold); }
 
 .mapDesc {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text-secondary);
   line-height: 1.5;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
 }
 
 .mapEffects {
@@ -125,14 +137,14 @@
 }
 
 .effect {
-  font-size: 12px;
-  padding: 4px 10px;
-  border-radius: 6px;
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 5px;
   font-family: var(--font-ui);
 }
 
-.debuff { background: rgba(231,76,60,0.15); color: var(--accent-red-bright); border: 1px solid rgba(231,76,60,0.3); }
-.neutral { background: rgba(39,174,96,0.1); color: var(--accent-green-bright); border: 1px solid rgba(39,174,96,0.2); }
+.debuff  { background: rgba(231,76,60,0.15); color: var(--accent-red-bright); border: 1px solid rgba(231,76,60,0.3); }
+.neutral { background: rgba(39,174,96,0.1);  color: var(--accent-green-bright); border: 1px solid rgba(39,174,96,0.2); }
 
 /* Shop */
 .shopSection {
@@ -212,24 +224,12 @@
   background: var(--bg-hover);
 }
 
-.owned {
-  opacity: 0.6;
-  border-color: var(--accent-green);
-  background: rgba(39,174,96,0.05);
-}
+.owned      { opacity: 0.6; border-color: var(--accent-green); background: rgba(39,174,96,0.05); }
+.cantAfford { opacity: 0.4; }
 
-.cantAfford {
-  opacity: 0.4;
-}
+.itemEmoji { font-size: 28px; flex-shrink: 0; }
 
-.itemEmoji {
-  font-size: 28px;
-  flex-shrink: 0;
-}
-
-.itemInfo {
-  flex: 1;
-}
+.itemInfo { flex: 1; }
 
 .itemName {
   font-family: var(--font-display);
@@ -239,10 +239,7 @@
   letter-spacing: 0.04em;
 }
 
-.itemDesc {
-  font-size: 13px;
-  color: var(--text-secondary);
-}
+.itemDesc { font-size: 13px; color: var(--text-secondary); }
 
 .itemActions {
   display: flex;
@@ -270,14 +267,8 @@
   transition: all 0.2s;
 }
 
-.buyBtn:hover:not(:disabled) {
-  background: linear-gradient(135deg, #d4a017, #f0c040);
-}
-
-.buyBtn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
+.buyBtn:hover:not(:disabled) { background: linear-gradient(135deg, #d4a017, #f0c040); }
+.buyBtn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .ownedBadge {
   font-family: var(--font-ui);
@@ -305,9 +296,7 @@
   margin-bottom: 14px;
 }
 
-.playerEmoji {
-  font-size: 28px;
-}
+.playerEmoji { font-size: 28px; }
 
 .playerName {
   font-family: var(--font-display);
@@ -316,16 +305,8 @@
   letter-spacing: 0.04em;
 }
 
-.playerClass {
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
-.playerCoins {
-  margin-left: auto;
-  font-size: 14px;
-  color: var(--accent-gold-bright);
-}
+.playerClass { font-size: 12px; color: var(--text-secondary); }
+.playerCoins { margin-left: auto; font-size: 14px; color: var(--accent-gold-bright); }
 
 .statGrid {
   display: grid;
@@ -344,11 +325,7 @@
 }
 
 .statIcon { font-size: 14px; }
-.statVal {
-  font-family: var(--font-ui);
-  font-size: 13px;
-  color: var(--text-primary);
-}
+.statVal  { font-family: var(--font-ui); font-size: 12px; color: var(--text-primary); }
 
 .inventory {
   border-top: 1px solid var(--border-dim);
@@ -364,11 +341,7 @@
   letter-spacing: 0.06em;
 }
 
-.invItems {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
+.invItems { display: flex; flex-wrap: wrap; gap: 6px; }
 
 .invItem {
   font-size: 12px;
@@ -396,16 +369,8 @@
 }
 
 .memberRow:last-child { border-bottom: none; }
-
-.memberName {
-  flex: 1;
-  color: var(--text-primary);
-}
-
-.memberClass {
-  font-size: 12px;
-  color: var(--text-secondary);
-}
+.memberName { flex: 1; color: var(--text-primary); }
+.memberClass { font-size: 12px; color: var(--text-secondary); }
 
 .you {
   font-size: 11px;

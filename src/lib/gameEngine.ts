@@ -2,7 +2,6 @@ import { GameState, Player, Monster, CombatLogEntry, MapId, ClassType } from './
 import { MAPS, SHOP_ITEMS, createPlayer, rollDice, calculateDamage, levelUp, CLASSES, SKILLS } from './gameData';
 import { nanoid } from 'nanoid';
 
-// Global in-memory state
 declare global {
   // eslint-disable-next-line no-var
   var gameRooms: Map<string, GameState>;
@@ -20,6 +19,7 @@ export function getOrCreateRoom(roomId: string): GameState {
       players: {},
       playerOrder: [],
       currentPlayerIndex: 0,
+      activePlayerId: null,
       currentMap: 1,
       currentMonsters: [],
       turn: 0,
@@ -30,6 +30,9 @@ export function getOrCreateRoom(roomId: string): GameState {
       unlockedClasses: ['warrior', 'mage', 'rogue', 'necromancer'],
       actionsThisTurn: {},
       shopItems: SHOP_ITEMS,
+      bossDefeated: false,
+      waveNumber: 0,
+      shopCountdown: 3,
     };
     global.gameRooms.set(roomId, state);
   }
@@ -52,9 +55,25 @@ function addLog(state: GameState, message: string, type: CombatLogEntry['type'])
     type,
     timestamp: Date.now(),
   });
-  // Keep last 50 entries
-  if (state.combatLog.length > 50) {
-    state.combatLog = state.combatLog.slice(-50);
+  if (state.combatLog.length > 80) {
+    state.combatLog = state.combatLog.slice(-80);
+  }
+}
+
+// Advance to the next alive player's turn
+function advanceToNextPlayer(state: GameState): void {
+  const alivePlayers = state.playerOrder.filter(pid => state.players[pid]?.isAlive);
+  if (alivePlayers.length === 0) return;
+
+  // Find next player who hasn't acted
+  const pending = alivePlayers.filter(pid => !state.actionsThisTurn[pid]);
+  if (pending.length > 0) {
+    state.activePlayerId = pending[0];
+    addLog(state, `🎯 Vez de ${state.players[pending[0]].name} agir!`, 'system');
+  } else {
+    // All alive players acted — run monster turns
+    state.activePlayerId = null;
+    processMonsterTurns(state);
   }
 }
 
@@ -130,14 +149,15 @@ export function selectMap(state: GameState, playerId: string, mapId: MapId): Gam
 
   state.currentMap = mapId;
   state.phase = 'shopping';
+  state.bossDefeated = false;
+  state.waveNumber = 0;
 
   const mapDef = MAPS.find(m => m.id === mapId)!;
   addLog(state, `🗺️ Mapa selecionado: ${mapDef.theme} ${mapDef.name}`, 'system');
   addLog(state, `🛒 Loja aberta! Comprem equipamentos antes da batalha.`, 'system');
 
-  // Give each player some starting coins
   Object.keys(state.players).forEach(pid => {
-    state.players[pid] = { ...state.players[pid], coins: 50 };
+    state.players[pid] = { ...state.players[pid], coins: state.players[pid].coins > 0 ? state.players[pid].coins : 50 };
   });
 
   return { ...state };
@@ -157,6 +177,10 @@ export function buyItem(state: GameState, playerId: string, itemId: string): Gam
     coins: player.coins - item.price,
     attack: player.attack + item.attackBonus,
     defense: player.defense + item.defenseBonus,
+    maxHp: player.maxHp + (item.hpBonus ?? 0),
+    hp: player.hp + (item.hpBonus ?? 0),
+    maxMp: player.maxMp + (item.mpBonus ?? 0),
+    mp: player.mp + (item.mpBonus ?? 0),
     inventory: [...player.inventory, item],
   };
 
@@ -168,7 +192,7 @@ export function buyItem(state: GameState, playerId: string, itemId: string): Gam
 export function startCombat(state: GameState): GameState {
   const mapDef = MAPS.find(m => m.id === state.currentMap)!;
 
-  // Spawn monsters (random selection + boss on last wave)
+  // Spawn monsters — random selection from pool
   const monstersToSpawn = [...mapDef.monsters]
     .sort(() => Math.random() - 0.5)
     .slice(0, 2 + Math.floor(Math.random() * 2));
@@ -179,10 +203,55 @@ export function startCombat(state: GameState): GameState {
   state.turnPhase = 'player_turns';
   state.actionsThisTurn = {};
   state.currentPlayerIndex = 0;
+  state.bossDefeated = false;
+  state.waveNumber = 1;
+  state.shopCountdown = 3;
+
+  // Restore all players to full HP/MP when starting fresh combat
+  Object.keys(state.players).forEach(pid => {
+    state.players[pid] = {
+      ...state.players[pid],
+      hp: state.players[pid].maxHp,
+      mp: state.players[pid].maxMp,
+      isAlive: true,
+    };
+  });
+
+  // Set first alive player as active
+  const firstAlive = state.playerOrder.find(pid => state.players[pid]?.isAlive);
+  state.activePlayerId = firstAlive ?? null;
 
   addLog(state, `⚔️ COMBATE INICIADO! Mapa: ${mapDef.name}`, 'system');
   addLog(state, `👹 Inimigos aparecem: ${state.currentMonsters.map(m => m.emoji + m.name).join(', ')}`, 'system');
-  addLog(state, `🎲 Turno ${state.turn} - Fase dos Jogadores`, 'system');
+  addLog(state, `🎲 Turno ${state.turn} — Vez de ${firstAlive ? state.players[firstAlive].name : '?'} agir!`, 'system');
+
+  return { ...state };
+}
+
+export function continueCombat(state: GameState): GameState {
+  // Called after a shop break — resume combat with current monsters/state
+  const mapDef = MAPS.find(m => m.id === state.currentMap)!;
+
+  // Spawn a new wave if no monsters remain
+  if (state.currentMonsters.filter(m => m.hp > 0).length === 0) {
+    const monstersToSpawn = [...mapDef.monsters]
+      .sort(() => Math.random() - 0.5)
+      .slice(0, 2 + Math.floor(Math.random() * 2));
+    state.currentMonsters = monstersToSpawn.map(m => ({ ...m, id: nanoid() }));
+    state.waveNumber += 1;
+    addLog(state, `🌊 Onda ${state.waveNumber}! Novos inimigos aparecem!`, 'system');
+  }
+
+  state.phase = 'combat';
+  state.turnPhase = 'player_turns';
+  state.actionsThisTurn = {};
+  state.shopCountdown = 3;
+
+  const firstAlive = state.playerOrder.find(pid => state.players[pid]?.isAlive);
+  state.activePlayerId = firstAlive ?? null;
+
+  addLog(state, `⚔️ Combate retomado! Turno ${state.turn}`, 'system');
+  if (firstAlive) addLog(state, `🎯 Vez de ${state.players[firstAlive].name} agir!`, 'system');
 
   return { ...state };
 }
@@ -196,6 +265,12 @@ export function processPlayerAction(
   if (state.turnPhase !== 'player_turns') return state;
   if (state.actionsThisTurn[playerId]) return state;
 
+  // Only the active player can act
+  if (state.activePlayerId !== playerId) {
+    addLog(state, `⏳ Aguarde sua vez!`, 'system');
+    return state;
+  }
+
   const player = state.players[playerId];
   if (!player || !player.isAlive) return state;
 
@@ -205,33 +280,30 @@ export function processPlayerAction(
   let updatedPlayer = { ...player };
 
   if (action.type === 'attack') {
-    const target = state.currentMonsters.find(m => m.id === action.targetId);
+    const target = state.currentMonsters.find(m => m.id === action.targetId && m.hp > 0);
     if (!target) return state;
 
     const dice = rollDice();
     let bonus = 0;
-
-    // Necromancer passive buff
     if (player.necromancerBuff && player.necromancerBuff.turnsLeft > 0) {
       bonus += player.necromancerBuff.damage;
     }
 
     const damage = calculateDamage(player.attack, target.defense, dice, bonus);
     const monsterIdx = state.currentMonsters.findIndex(m => m.id === action.targetId);
-    state.currentMonsters[monsterIdx] = {
-      ...target,
-      hp: Math.max(0, target.hp - damage),
-    };
+    state.currentMonsters[monsterIdx] = { ...target, hp: Math.max(0, target.hp - damage) };
 
-    addLog(state, `${player.name} ${CLASSES[player.classType].emoji} ataca ${target.emoji}${target.name}! [Dado: ${dice}] Dano: ${damage}`, 'player_action');
+    addLog(state, `${player.name} ${CLASSES[player.classType].emoji} ataca ${target.emoji}${target.name}! [🎲${dice}] Dano: ${damage}`, 'player_action');
 
     if (state.currentMonsters[monsterIdx].hp <= 0) {
       addLog(state, `💀 ${target.emoji}${target.name} foi derrotado!`, 'system');
       distributeRewards(state, target);
     }
+
   } else if (action.type === 'skill') {
     const skills = SKILLS[player.classType];
-    const skill = skills[action.skillIndex ?? 3]; // default special
+    const skillIdx = action.skillIndex ?? 3;
+    const skill = skills[skillIdx];
     if (!skill) return state;
 
     const mpCost = Math.ceil(skill.mpCost * manaMult);
@@ -242,11 +314,14 @@ export function processPlayerAction(
 
     updatedPlayer.mp -= mpCost;
 
-    if (skill.damage && action.targetId) {
-      if (action.skillIndex === 3 && (player.classType === 'mage' || player.classType === 'ranger')) {
-        // AoE
+    // Damage skills
+    if (skill.damage !== undefined) {
+      const isAoE = skillIdx === 3 && (player.classType === 'mage' || player.classType === 'ranger');
+
+      if (isAoE) {
         const dice = rollDice();
         state.currentMonsters = state.currentMonsters.map(m => {
+          if (m.hp <= 0) return m;
           const dmg = calculateDamage(player.attack + skill.damage!, Math.floor(m.defense * 0.5), dice);
           const newHp = Math.max(0, m.hp - dmg);
           addLog(state, `💥 ${skill.emoji} ${skill.name} atinge ${m.emoji}${m.name} por ${dmg} de dano!`, 'player_action');
@@ -257,7 +332,7 @@ export function processPlayerAction(
           return { ...m, hp: newHp };
         });
       } else {
-        const target = state.currentMonsters.find(m => m.id === action.targetId);
+        const target = state.currentMonsters.find(m => m.id === action.targetId && m.hp > 0);
         if (target) {
           const dice = rollDice();
           const damage = calculateDamage(player.attack + skill.damage, Math.floor(target.defense * 0.5), dice);
@@ -272,8 +347,9 @@ export function processPlayerAction(
       }
     }
 
-    if (skill.heal) {
-      if (action.skillIndex === 3 && player.classType === 'paladin') {
+    // Heal skills
+    if (skill.heal !== undefined) {
+      if (skillIdx === 3 && player.classType === 'paladin') {
         Object.keys(state.players).forEach(pid => {
           if (state.players[pid].isAlive) {
             const healed = Math.min(state.players[pid].maxHp, state.players[pid].hp + skill.heal!);
@@ -282,13 +358,14 @@ export function processPlayerAction(
         });
         addLog(state, `${player.name} usa ${skill.emoji} ${skill.name}! Cura ${skill.heal}HP para todos!`, 'player_action');
       } else if (action.targetId && state.players[action.targetId]) {
-        const target = state.players[action.targetId];
-        const healed = Math.min(target.maxHp, target.hp + skill.heal);
-        state.players[action.targetId] = { ...target, hp: healed };
-        addLog(state, `${player.name} usa ${skill.emoji} ${skill.name} em ${target.name}! Cura ${skill.heal}HP.`, 'player_action');
+        const targetPlayer = state.players[action.targetId];
+        const healed = Math.min(targetPlayer.maxHp, targetPlayer.hp + skill.heal);
+        state.players[action.targetId] = { ...targetPlayer, hp: healed };
+        addLog(state, `${player.name} usa ${skill.emoji} ${skill.name} em ${targetPlayer.name}! Cura ${skill.heal}HP.`, 'player_action');
       }
     }
 
+    // Special effects
     if (skill.effect === 'necro_buff') {
       updatedPlayer.necromancerBuff = { damage: 4, turnsLeft: 3 };
       addLog(state, `${player.name} invoca um Morto-Vivo! +4 dano por 3 turnos!`, 'player_action');
@@ -298,18 +375,14 @@ export function processPlayerAction(
   state.players[playerId] = updatedPlayer;
   state.actionsThisTurn[playerId] = true;
 
-  // Check if all alive players acted
-  const alivePlayers = Object.values(state.players).filter(p => p.isAlive);
-  const allActed = alivePlayers.every(p => state.actionsThisTurn[p.id]);
-
-  if (allActed) {
-    processMonsterTurns(state);
+  // Check battle end before advancing turn
+  checkBattleEnd(state);
+  if (state.phase === 'victory' || state.phase === 'defeat' || state.phase === 'shopping') {
+    return { ...state };
   }
 
-  // Clean dead monsters
-  state.currentMonsters = state.currentMonsters.filter(m => m.hp > 0);
-
-  checkBattleEnd(state);
+  // Advance to next player
+  advanceToNextPlayer(state);
 
   return { ...state };
 }
@@ -317,11 +390,16 @@ export function processPlayerAction(
 function distributeRewards(state: GameState, monster: Monster): void {
   const alivePlayers = Object.values(state.players).filter(p => p.isAlive);
   const xpEach = Math.ceil(monster.xpReward / alivePlayers.length);
+  const coinsEach = Math.ceil(monster.coinReward / alivePlayers.length);
 
   state.groupCoins += monster.coinReward;
 
   alivePlayers.forEach(p => {
-    let updatedPlayer = { ...p, xp: p.xp + xpEach };
+    let updatedPlayer = {
+      ...p,
+      xp: p.xp + xpEach,
+      coins: p.coins + coinsEach,
+    };
     const result = levelUp(updatedPlayer);
     if (result.didLevelUp) {
       addLog(state, `🎉 ${p.name} subiu para o nível ${result.player.level}! HP e Dano aumentaram!`, 'level_up');
@@ -329,7 +407,7 @@ function distributeRewards(state: GameState, monster: Monster): void {
     state.players[p.id] = result.player;
   });
 
-  addLog(state, `💰 +${monster.coinReward} moedas para o grupo! +${xpEach} XP cada.`, 'system');
+  addLog(state, `💰 +${monster.coinReward} moedas (+${coinsEach} cada)! +${xpEach} XP cada.`, 'system');
 }
 
 function processMonsterTurns(state: GameState): void {
@@ -353,11 +431,8 @@ function processMonsterTurns(state: GameState): void {
       hp: Math.max(0, state.players[target.id].hp - damage),
     };
 
-    if (mapDef.defenseDebuff > 0) {
-      addLog(state, `${monster.emoji}${monster.name} ataca ${target.name}! [Dado: ${dice}] Dano: ${damage} (Defesa reduzida -20%)`, 'monster_action');
-    } else {
-      addLog(state, `${monster.emoji}${monster.name} ataca ${target.name}! [Dado: ${dice}] Dano: ${damage}`, 'monster_action');
-    }
+    const debuffNote = mapDef.defenseDebuff > 0 ? ` (Defesa -${mapDef.defenseDebuff * 100}%)` : '';
+    addLog(state, `${monster.emoji}${monster.name} ataca ${target.name}! [🎲${dice}] Dano: ${damage}${debuffNote}`, 'monster_action');
 
     if (state.players[target.id].hp <= 0) {
       state.players[target.id] = { ...state.players[target.id], isAlive: false };
@@ -377,12 +452,46 @@ function processMonsterTurns(state: GameState): void {
     }
   });
 
-  // Next turn
+  // MP regeneration: +10% max MP per turn for all alive players
+  Object.keys(state.players).forEach(pid => {
+    const p = state.players[pid];
+    if (p.isAlive) {
+      const mpRegen = Math.max(1, Math.floor(p.maxMp * 0.10));
+      const newMp = Math.min(p.maxMp, p.mp + mpRegen);
+      if (newMp > p.mp) {
+        state.players[pid] = { ...state.players[pid], mp: newMp };
+      }
+    }
+  });
+  addLog(state, `💎 Regeneração de Mana! +10% MP para todos.`, 'system');
+
+  // Advance turn counter
   state.turn += 1;
+  state.shopCountdown -= 1;
   state.turnPhase = 'player_turns';
   state.actionsThisTurn = {};
-  state.currentPlayerIndex = 0;
-  addLog(state, `🎲 Turno ${state.turn} - Fase dos Jogadores`, 'system');
+
+  // Check battle end
+  checkBattleEnd(state);
+  if (state.phase === 'victory' || state.phase === 'defeat' || state.phase === 'shopping') return;
+
+  // Shop break every 3 turns
+  if (state.shopCountdown <= 0) {
+    state.phase = 'shopping';
+    addLog(state, `🛒 Pausa para loja! Próximos 3 turnos de combate se aproximam...`, 'system');
+    // Give each player some coins for the shop break
+    Object.keys(state.players).forEach(pid => {
+      state.players[pid] = { ...state.players[pid], coins: state.players[pid].coins + 20 };
+    });
+    addLog(state, `💰 +20 moedas para cada jogador!`, 'system');
+    return;
+  }
+
+  // Set next active player
+  const firstAlive = state.playerOrder.find(pid => state.players[pid]?.isAlive);
+  state.activePlayerId = firstAlive ?? null;
+  addLog(state, `🎲 Turno ${state.turn} — Fase dos Jogadores`, 'system');
+  if (firstAlive) addLog(state, `🎯 Vez de ${state.players[firstAlive].name} agir!`, 'system');
 }
 
 function checkBattleEnd(state: GameState): void {
@@ -396,36 +505,50 @@ function checkBattleEnd(state: GameState): void {
   }
 
   if (aliveMonsters.length === 0) {
-    // Check if there's a boss left
     const mapDef = MAPS.find(m => m.id === state.currentMap)!;
-    const bossDefeated = !state.currentMonsters.some(m => m.isBoss && m.hp > 0);
+    const hadBoss = state.currentMonsters.some(m => m.isBoss);
 
-    if (bossDefeated && state.currentMonsters.some(m => m.isBoss)) {
-      // Boss was defeated - unlock next map and classes
+    if (hadBoss && !state.bossDefeated) {
+      // Boss wave cleared — victory!
+      state.bossDefeated = true;
+
       const nextMapId = (state.currentMap + 1) as MapId;
-      if (nextMapId <= 3 && !state.unlockedMaps.includes(nextMapId)) {
+      if (nextMapId <= 7 && !state.unlockedMaps.includes(nextMapId)) {
         state.unlockedMaps.push(nextMapId);
-        addLog(state, `🗺️ Mapa ${MAPS.find(m => m.id === nextMapId)?.name} desbloqueado!`, 'system');
+        const nextMap = MAPS.find(m => m.id === nextMapId);
+        addLog(state, `🗺️ Mapa ${nextMap?.theme} ${nextMap?.name} desbloqueado!`, 'system');
       }
 
-      // Unlock classes
-      if (state.currentMap === 1 && !state.unlockedClasses.includes('paladin')) {
+      // Unlock classes based on map cleared
+      if (state.currentMap >= 1 && !state.unlockedClasses.includes('paladin')) {
         state.unlockedClasses.push('paladin');
         addLog(state, `🛡️ Classe PALADINO desbloqueada!`, 'level_up');
       }
-      if (state.currentMap === 2 && !state.unlockedClasses.includes('ranger')) {
+      if (state.currentMap >= 2 && !state.unlockedClasses.includes('ranger')) {
         state.unlockedClasses.push('ranger');
         addLog(state, `🏹 Classe ARQUEIRO desbloqueada!`, 'level_up');
       }
 
+      // Bonus coins for boss kill
+      Object.keys(state.players).forEach(pid => {
+        state.players[pid] = { ...state.players[pid], coins: state.players[pid].coins + 50 };
+      });
+      addLog(state, `💰 +50 moedas de bônus por derrotar o Boss!`, 'level_up');
+
       state.phase = 'victory';
       addLog(state, `🏆 VITÓRIA! O ${mapDef.theme} ${mapDef.name} foi conquistado!`, 'system');
-    } else {
-      // Wave cleared, spawn boss
+
+    } else if (!hadBoss) {
+      // Regular wave cleared — spawn boss now
       addLog(state, `💥 Onda limpa! O BOSS aparece!`, 'system');
-      state.currentMonsters = [{ ...mapDef.boss, id: nanoid() }];
+      state.currentMonsters = [{ ...mapDef.boss, id: nanoid(), hp: mapDef.boss.maxHp }];
       state.actionsThisTurn = {};
+
+      const firstAlive = state.playerOrder.find(pid => state.players[pid]?.isAlive);
+      state.activePlayerId = firstAlive ?? null;
+      if (firstAlive) addLog(state, `🎯 Vez de ${state.players[firstAlive].name} agir!`, 'system');
     }
+    // If hadBoss && bossDefeated is already true, do nothing (shouldn't happen)
   }
 }
 
