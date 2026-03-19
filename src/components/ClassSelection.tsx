@@ -20,29 +20,21 @@ export default function ClassSelection({ gameState, myId, onSelectClass, onReady
     <div className={styles.container}>
       <div className={styles.header}>
         <h2 className={styles.title}>⚔ Escolha sua Classe</h2>
-        <p className={styles.subtitle}>Cada classe possui habilidades únicas e atributos distintos</p>
+        <p className={styles.subtitle}>12 classes disponíveis — cada uma com 6 habilidades únicas</p>
       </div>
 
       <div className={styles.grid}>
         {(Object.entries(CLASSES) as [ClassType, typeof CLASSES[ClassType]][]).map(([key, cls]) => {
-          const isUnlocked = gameState.unlockedClasses.includes(key);
           const isSelected = selectedClass === key;
           const skills = SKILLS[key];
 
           return (
             <div
               key={key}
-              className={`${styles.card} ${isSelected ? styles.selected : ''} ${!isUnlocked ? styles.locked : ''}`}
-              onClick={() => isUnlocked && !isReady && onSelectClass(key)}
+              className={`${styles.card} ${isSelected ? styles.selected : ''}`}
+              onClick={() => !isReady && onSelectClass(key)}
               style={{ '--cls-color': cls.color } as React.CSSProperties}
             >
-              {!isUnlocked && (
-                <div className={styles.lockOverlay}>
-                  <span className={styles.lockIcon}>🔒</span>
-                  <span>Derrote o boss do Mapa {cls.unlockMap} para desbloquear</span>
-                </div>
-              )}
-
               <div className={styles.cardHeader}>
                 <span className={styles.emoji}>{cls.emoji}</span>
                 <div>
@@ -52,25 +44,23 @@ export default function ClassSelection({ gameState, myId, onSelectClass, onReady
               </div>
 
               <div className={styles.stats}>
-                <StatBar label="HP" value={cls.baseStats.hp} max={120} color="var(--hp-color)" />
-                <StatBar label="MP" value={cls.baseStats.mp} max={120} color="var(--mp-color)" />
-                <StatBar label="ATK" value={cls.baseStats.attack} max={15} color="var(--accent-red-bright)" />
-                <StatBar label="DEF" value={cls.baseStats.defense} max={10} color="var(--accent-blue-bright)" />
+                <StatBar label="HP"  value={cls.baseStats.hp}      max={160} color="var(--hp-color)" />
+                <StatBar label="MP"  value={cls.baseStats.mp}      max={140} color="var(--mp-color)" />
+                <StatBar label="ATK" value={cls.baseStats.attack}  max={15}  color="var(--accent-red-bright)" />
+                <StatBar label="DEF" value={cls.baseStats.defense} max={14}  color="var(--accent-blue-bright)" />
               </div>
 
+              {/* All 6 skills */}
               <div className={styles.skillList}>
-                {skills.slice(0, 3).map((sk, i) => (
-                  <div key={i} className={styles.skill}>
+                {skills.map((sk, i) => (
+                  <div key={i} className={`${styles.skill} ${i >= 3 ? styles.specialSkill : ''}`}>
                     <span>{sk.emoji}</span>
                     <span className={styles.skillName}>{sk.name}</span>
-                    {sk.mpCost > 0 && <span className={styles.mpCost}>{sk.mpCost}MP</span>}
+                    {sk.mpCost > 0
+                      ? <span className={styles.mpCost}>{sk.mpCost}MP</span>
+                      : <span className={styles.freeCost}>livre</span>}
                   </div>
                 ))}
-                <div className={styles.skill + ' ' + styles.specialSkill}>
-                  <span>⭐</span>
-                  <span className={styles.skillName}>{skills[3]?.name}</span>
-                  <span className={styles.mpCost}>{skills[3]?.mpCost}MP</span>
-                </div>
               </div>
 
               {isSelected && <div className={styles.selectedBadge}>✓ Selecionado</div>}
@@ -96,7 +86,7 @@ export default function ClassSelection({ gameState, myId, onSelectClass, onReady
         <button
           className={styles.readyBtn}
           onClick={onReady}
-          disabled={isReady || !selectedClass || selectedClass === 'warrior' && !myPlayer}
+          disabled={isReady || !selectedClass}
         >
           {isReady ? '✓ Pronto!' : 'Confirmar Classe'}
         </button>
