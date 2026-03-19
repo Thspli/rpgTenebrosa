@@ -931,6 +931,3 @@ export function proceedToNextMap(state: GameState): GameState {
 export function resetRoom(roomId: string): void {
   global.gameRooms.delete(roomId);
 }
-
-// Legacy exports (socket.ts calls these)
-export function startCombat(state: GameState): GameState { return continueCombat(state); }
