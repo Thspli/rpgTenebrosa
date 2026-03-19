@@ -8,7 +8,7 @@ import styles from './Combat.module.css';
 interface Props {
   gameState: GameState;
   myId: string;
-  onAction: (action: { type: string; targetId?: string; skillIndex?: number }) => void;
+  onAction: (action: { type: string; targetId?: string; skillIndex?: number; itemId?: string }) => void;
   onReset: () => void;
 }
 
