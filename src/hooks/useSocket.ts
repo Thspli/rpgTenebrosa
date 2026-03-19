@@ -18,7 +18,10 @@ export function useSocket() {
 
     // Initialize socket connection
     fetch('/api/socket').finally(() => {
-      socket = io({ path: '/api/socket', addTrailingSlash: false });
+      socket = io(window.location.origin, {
+        path: '/api/socket',
+        addTrailingSlash: false,
+      });
 
       socket.on('connect', () => {
         setConnected(true);
