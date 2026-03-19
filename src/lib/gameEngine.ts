@@ -378,7 +378,7 @@ export function processPlayerAction(
   // Check battle end before advancing turn
   checkBattleEnd(state);
   const phaseAfterCheck = (state as GameState).phase;
-  if (phaseAfterCheck === 'victory' || phaseAfterCheck === 'defeat' || phaseAfterCheck === 'shopping') {
+  if (phaseAfterCheck === 'victory_shopping' || phaseAfterCheck === 'defeat' || phaseAfterCheck === 'shopping') {
     return { ...state };
   }
 
