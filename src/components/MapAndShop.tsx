@@ -9,12 +9,11 @@ interface Props {
   myId: string;
   onSelectMap: (mapId: MapId) => void;
   onBuyItem: (itemId: string) => void;
-  onStartCombat: () => void;
   onShopReady: () => void;
   onProceedToNextMap: () => void;
 }
 
-export default function MapAndShop({ gameState, myId, onSelectMap, onBuyItem, onStartCombat, onShopReady, onProceedToNextMap }: Props) {
+export default function MapAndShop({ gameState, myId, onSelectMap, onBuyItem, onShopReady, onProceedToNextMap }: Props) {
   const myPlayer = gameState.players[myId];
   const phase = gameState.phase;
   const isMidCombatShop = phase === 'shopping' && gameState.turn > 0;
@@ -130,22 +129,16 @@ export default function MapAndShop({ gameState, myId, onSelectMap, onBuyItem, on
                 {readyCount}/{totalCount} prontos
               </div>
 
-              {phase === 'map_selection' ? (
-                <button className={styles.startBtn} onClick={onStartCombat}>
-                  ⚔️ Iniciar Combate!
-                </button>
-              ) : (
-                <button
-                  className={amIReady ? styles.cancelReadyBtn : styles.readyBtn}
-                  onClick={onShopReady}
-                >
-                  {amIReady
-                    ? '❌ Cancelar Pronto'
-                    : isVictoryShop
-                      ? `➡️ Pronto para ${nextMap ? nextMap.name : 'Fim de Jogo'}!`
-                      : '⚔️ Pronto para Combate!'}
-                </button>
-              )}
+              <button
+                className={amIReady ? styles.cancelReadyBtn : styles.readyBtn}
+                onClick={onShopReady}
+              >
+                {amIReady
+                  ? '❌ Cancelar Pronto'
+                  : isVictoryShop
+                    ? `➡️ Pronto para ${nextMap ? nextMap.name : 'Fim de Jogo'}!`
+                    : '⚔️ Pronto para Combate!'}
+              </button>
             </div>
           </div>
 

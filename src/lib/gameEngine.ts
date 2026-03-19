@@ -260,7 +260,12 @@ export function toggleShopReady(state: GameState, playerId: string): GameState {
 }
 
 export function continueCombat(state: GameState): GameState {
-  // Called after a shop break — resume combat with current monsters/state
+  // First time (turn=0) — delegate to startCombat for full init
+  if (state.turn === 0) {
+    return startCombat(state);
+  }
+
+  // Called after a mid-combat shop break
   const mapDef = MAPS.find(m => m.id === state.currentMap)!;
 
   // Spawn a new wave if no monsters remain

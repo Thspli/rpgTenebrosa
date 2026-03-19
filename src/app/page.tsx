@@ -50,7 +50,6 @@ export default function GamePage() {
         myId={myId}
         onSelectMap={(mapId: MapId) => emit('select_map', { mapId })}
         onBuyItem={(itemId: string) => emit('buy_item', { itemId })}
-        onStartCombat={() => emit('start_combat')}
         onShopReady={() => emit('shop_ready')}
         onProceedToNextMap={() => emit('proceed_to_next_map')}
       />
@@ -73,4 +72,4 @@ export default function GamePage() {
       <p className={styles.loadingText}>Phase: {phase}</p>
     </div>
   );
-}
+} 
