@@ -258,6 +258,8 @@ export function toggleShopReady(state: GameState, playerId: string): GameState {
 
   return { ...state };
 }
+
+export function continueCombat(state: GameState): GameState {
   // Called after a shop break — resume combat with current monsters/state
   const mapDef = MAPS.find(m => m.id === state.currentMap)!;
 
