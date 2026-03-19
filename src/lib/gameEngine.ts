@@ -1,4 +1,4 @@
-import { GameState, Player, Monster, CombatLogEntry, MapId, ClassType } from './types';
+import { GameState, Player, Monster, CombatLogEntry, MapId, ClassType, StatusEffect } from './types';
 import { MAPS, SHOP_ITEMS, createPlayer, rollDice, calculateDamage, levelUp, CLASSES, SKILLS } from './gameData';
 import { nanoid } from 'nanoid';
 
@@ -446,9 +446,18 @@ export function processPlayerAction(
     }
 
     // Special effects
-    if (skill.effect === 'necro_buff') {
-      updatedPlayer.necromancerBuff = { damage: 6, turnsLeft: 4 };
-      addLog(state, `${player.name} invoca um Morto-Vivo! Todo o grupo recebe +6 dano por 4 turnos!`, 'player_action');
+    if (skill.effect === 'balada') {
+      Object.keys(state.players).forEach(pid => {
+        if (state.players[pid].isAlive) {
+          state.players[pid] = {
+            ...state.players[pid],
+            attack: state.players[pid].attack + 5,
+            defense: state.players[pid].defense + 5,
+            hp: Math.min(state.players[pid].maxHp, state.players[pid].hp + 20),
+          };
+        }
+      });
+      addLog(state, `${player.name} toca ${skill.emoji} ${skill.name}! +5 ATK/DEF e +20HP para todos!`, 'player_action');
     }
 
     if (skill.effect === 'revive' && action.targetId && state.players[action.targetId]) {
@@ -457,6 +466,17 @@ export function processPlayerAction(
         const reviveHp = Math.floor(target.maxHp * 0.3);
         state.players[action.targetId] = { ...target, isAlive: true, hp: reviveHp };
         addLog(state, `${player.name} usa ${skill.emoji} ${skill.name}! ${target.name} reviveu com ${reviveHp}HP!`, 'player_action');
+      }
+    }
+
+    if (skill.effect === 'poison' && action.targetId) {
+      const targetMonster = state.currentMonsters.find(m => m.id === action.targetId && m.hp > 0);
+      if (targetMonster) {
+        const effect: StatusEffect = { type: 'poisoned', value: 5, turnsLeft: 3 };
+        const existing = targetMonster.statusEffects || [];
+        existing.push(effect);
+        state.currentMonsters[state.currentMonsters.findIndex(m => m.id === action.targetId)] = { ...targetMonster, statusEffects: existing };
+        addLog(state, `${player.name} envenena ${targetMonster.emoji}${targetMonster.name}! Dano de veneno por 3 turnos.`, 'player_action');
       }
     }
   }
@@ -510,24 +530,44 @@ function processMonsterTurns(state: GameState): void {
   aliveMonsters.forEach(monster => {
     if (alivePlayers.length === 0) return;
 
-    const target = alivePlayers[Math.floor(Math.random() * alivePlayers.length)];
-    const dice = rollDice();
-    const mapDef = MAPS.find(m => m.id === state.currentMap)!;
-    const effectiveDef = Math.floor(target.defense * (1 - mapDef.defenseDebuff));
-    const damage = calculateDamage(monster.attack, effectiveDef, dice);
+    const attackCount = monster.isBoss ? 2 + Math.floor(Math.random() * 2) : 1; // Bosses attack 2-3 times
+    for (let i = 0; i < attackCount; i++) {
+      if (alivePlayers.length === 0) break;
+      const target = alivePlayers[Math.floor(Math.random() * alivePlayers.length)];
+      const dice = rollDice();
+      const mapDef = MAPS.find(m => m.id === state.currentMap)!;
+      const effectiveDef = Math.floor(target.defense * (1 - mapDef.defenseDebuff));
+      const damage = calculateDamage(monster.attack, effectiveDef, dice);
 
-    state.players[target.id] = {
-      ...state.players[target.id],
-      hp: Math.max(0, state.players[target.id].hp - damage),
-    };
+      state.players[target.id] = {
+        ...state.players[target.id],
+        hp: Math.max(0, state.players[target.id].hp - damage),
+      };
 
-    const debuffNote = mapDef.defenseDebuff > 0 ? ` (Defesa -${mapDef.defenseDebuff * 100}%)` : '';
-    addLog(state, `${monster.emoji}${monster.name} ataca ${target.name}! [🎲${dice}] Dano: ${damage}${debuffNote}`, 'monster_action');
+      const debuffNote = mapDef.defenseDebuff > 0 ? ` (Defesa -${mapDef.defenseDebuff * 100}%)` : '';
+      addLog(state, `${monster.emoji}${monster.name} ataca ${target.name}! [🎲${dice}] Dano: ${damage}${debuffNote}`, 'monster_action');
 
-    if (state.players[target.id].hp <= 0) {
-      state.players[target.id] = { ...state.players[target.id], isAlive: false };
-      addLog(state, `💀 ${target.name} foi derrotado!`, 'death');
+      if (state.players[target.id].hp <= 0) {
+        state.players[target.id] = { ...state.players[target.id], isAlive: false };
+        addLog(state, `💀 ${target.name} foi derrotado!`, 'death');
+      }
     }
+  });
+
+  // Apply status effects to monsters
+  state.currentMonsters = state.currentMonsters.map(monster => {
+    if (monster.hp <= 0) return monster;
+    const effects = monster.statusEffects || [];
+    let newHp = monster.hp;
+    const newEffects = effects.filter(effect => {
+      if (effect.type === 'poisoned') {
+        newHp -= effect.value;
+        addLog(state, `${monster.emoji}${monster.name} sofre ${effect.value} dano de veneno!`, 'monster_action');
+      }
+      effect.turnsLeft -= 1;
+      return effect.turnsLeft > 0;
+    });
+    return { ...monster, hp: Math.max(0, newHp), statusEffects: newEffects.length > 0 ? newEffects : undefined };
   });
 
   // Tick necromancer buffs

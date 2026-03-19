@@ -67,7 +67,7 @@ export const CLASSES: Record<ClassType, ClassDefinition> = {
   guardian: {
     name: 'Guardião', emoji: '🗿',
     description: 'Fortíssimo e lento. Absorve dano pelos aliados e contra-ataca.',
-    baseStats: { hp: 160, mp: 50, attack: 6, defense: 14 },
+    baseStats: { hp: 180, mp: 60, attack: 8, defense: 16 },
     special: 'Muralha: Bloqueia todo dano do grupo por 1 turno.',
     unlockedByDefault: true, color: '#7f8c8d',
   },
@@ -200,25 +200,25 @@ export const MAPS: MapDefinition[] = [
     description: 'Uma floresta antiga cheia de criaturas selvagens.',
     difficulty: 'Iniciante', defenseDebuff: 0, manaCostMultiplier: 1, bgColor: '#1a2f1a', unlocked: true,
     monsters: [
-      makeMonster('goblin','Goblin','👺',1,30,4,1,15,5),
-      makeMonster('wolf','Lobo Selvagem','🐺',1,25,5,2,12,4),
-      makeMonster('slime','Gosma Verde','🟢',1,20,3,0,10,3),
-      makeMonster('spider','Aranha Gigante','🕷️',1,28,4,1,14,4),
-      makeMonster('bandit','Bandido','🪓',1,32,5,1,16,6),
+      makeMonster('goblin','Goblin','👺',1,40,6,1,18,6),
+      makeMonster('wolf','Lobo Selvagem','🐺',1,35,7,2,14,5),
+      makeMonster('slime','Gosma Verde','🟢',1,25,4,0,12,4),
+      makeMonster('spider','Aranha Gigante','🕷️',1,38,5,1,16,5),
+      makeMonster('bandit','Bandido','🪓',1,42,6,1,18,7),
     ],
-    boss: makeMonster('troll','Troll da Floresta','👹',2,120,8,4,80,30,true),
+    boss: makeMonster('troll','Troll da Floresta','👹',2,200,15,6,100,40,true),
   },
   {
     id: 2, name: 'Pântano Maldito', theme: '🌿',
     description: 'Terrenos alagados com criaturas venenosas.',
     difficulty: 'Iniciante', defenseDebuff: 0, manaCostMultiplier: 1, bgColor: '#1a2a10', unlocked: false,
     monsters: [
-      makeMonster('frog','Sapo Venenoso','🐸',2,35,6,2,20,7),
-      makeMonster('snake','Serpente do Pântano','🐍',2,30,7,1,18,6),
-      makeMonster('mushroom','Cogumelo Tóxico','🍄',2,40,4,3,22,8),
-      makeMonster('lizard','Lagarto Gigante','🦎',2,38,6,2,21,7),
+      makeMonster('frog','Sapo Venenoso','🐸',2,45,8,2,24,9),
+      makeMonster('snake','Serpente do Pântano','🐍',2,40,9,1,22,8),
+      makeMonster('mushroom','Cogumelo Tóxico','🍄',2,50,5,3,26,10),
+      makeMonster('lizard','Lagarto Gigante','🦎',2,48,8,2,25,9),
     ],
-    boss: makeMonster('hydra','Hidra do Pântano','🐲',3,180,10,5,120,45,true),
+    boss: makeMonster('hydra','Hidra do Pântano','🐲',3,250,18,7,140,55,true),
   },
   {
     id: 3, name: 'Cavernas de Pedra', theme: '🪨',
@@ -231,7 +231,7 @@ export const MAPS: MapDefinition[] = [
       makeMonster('cave_bat','Morcego Gigante','🦇',5,55,11,3,35,12),
       makeMonster('troll_cave','Troll das Cavernas','👾',5,75,11,5,42,16),
     ],
-    boss: makeMonster('stone_golem','Golem de Pedra','⛏️',6,250,16,12,180,70,true),
+    boss: makeMonster('stone_golem','Golem de Pedra','⛏️',6,300,18,14,200,80,true),
   },
   {
     id: 4, name: 'Ruínas Amaldiçoadas', theme: '🏚️',
@@ -243,7 +243,7 @@ export const MAPS: MapDefinition[] = [
       makeMonster('zombie','Zumbi Antigo','🧟',7,90,10,5,52,21),
       makeMonster('wraith','Espectro Sombrio','🌑',7,70,14,4,58,23),
     ],
-    boss: makeMonster('lich_king','Rei Lich','☠️',8,320,19,10,250,95,true),
+    boss: makeMonster('lich_king','Rei Lich','☠️',8,380,21,12,280,110,true),
   },
   {
     id: 5, name: 'Vulcão Ardente', theme: '🌋',
@@ -255,7 +255,7 @@ export const MAPS: MapDefinition[] = [
       makeMonster('fire_drake','Drake Flamejante','🐉',9,110,17,8,72,29),
       makeMonster('ember_spirit','Espírito da Brasa','✨',9,90,18,5,68,27),
     ],
-    boss: makeMonster('fire_titan','Titã de Fogo','🔴',10,400,22,14,350,140,true),
+    boss: makeMonster('fire_titan','Titã de Fogo','🔴',10,450,24,16,400,160,true),
   },
   {
     id: 6, name: 'Torre do Abismo', theme: '🏰',
@@ -267,7 +267,7 @@ export const MAPS: MapDefinition[] = [
       makeMonster('dragon_small','Draconato','🐉',10,160,17,12,100,40),
       makeMonster('dark_knight','Cavaleiro das Trevas','🖤',10,150,19,11,98,39),
     ],
-    boss: makeMonster('demon_lord','Lorde Demoníaco','👿',11,500,25,15,500,200,true),
+    boss: makeMonster('demon_lord','Lorde Demoníaco','👿',11,550,27,17,550,220,true),
   },
   {
     id: 7, name: 'Reino dos Deuses Caídos', theme: '⚡',
@@ -279,7 +279,7 @@ export const MAPS: MapDefinition[] = [
       makeMonster('void_reaper','Ceifador do Vazio','🌑',15,190,26,12,160,64),
       makeMonster('titan_spawn','Filhote de Titã','👁️',15,210,23,16,152,61),
     ],
-    boss: makeMonster('ancient_god','Deus Antigo Corrompido','🌟',20,999,35,20,1000,400,true),
+    boss: makeMonster('ancient_god','Deus Antigo Corrompido','🌟',20,1200,40,22,1200,450,true),
   },
 ];
 

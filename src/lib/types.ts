@@ -82,6 +82,7 @@ export interface Monster {
   xpReward: number;
   coinReward: number;
   isBoss: boolean;
+  statusEffects?: StatusEffect[];
 }
 
 export interface MapDefinition {
