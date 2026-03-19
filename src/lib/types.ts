@@ -39,7 +39,42 @@ export interface Item {
   consumeHeal?: number;
   consumeMpHeal?: number;
   quantity?: number;
+  permanent?: boolean; // equipment that persists across maps/class changes
 }
+
+export interface PlayerBuffs {
+  // Temporary ATK/DEF bonus (lasts N turns)
+  tempAtkBonus: number;
+  tempDefBonus: number;
+  tempBonusTurns: number;
+  // Regen
+  regenHpPerTurn: number;
+  regenTurnsLeft: number;
+  // Dodge (skip next incoming hits)
+  dodgeTurnsLeft: number;
+  // Aim (bonus on next basic attack)
+  aimBonus: number;
+  // Counter-reflect
+  counterReflect: number; // fraction 0–1
+  // Guardian wall (reduce all group damage)
+  wallTurnsLeft: number;
+  // Necromancer group buff
+  necroBonusDmg: number;
+  necroBonusTurnsLeft: number;
+  // Berserk
+  berserkTurnsLeft: number;
+}
+
+export const DEFAULT_BUFFS: PlayerBuffs = {
+  tempAtkBonus: 0, tempDefBonus: 0, tempBonusTurns: 0,
+  regenHpPerTurn: 0, regenTurnsLeft: 0,
+  dodgeTurnsLeft: 0,
+  aimBonus: 0,
+  counterReflect: 0,
+  wallTurnsLeft: 0,
+  necroBonusDmg: 0, necroBonusTurnsLeft: 0,
+  berserkTurnsLeft: 0,
+};
 
 export interface Player {
   id: string;
@@ -60,13 +95,23 @@ export interface Player {
   coins: number;
   isReady: boolean;
   isAlive: boolean;
-  necromancerBuff?: { damage: number; turnsLeft: number };
+  buffs: PlayerBuffs;
+  // Legacy (kept for compat)
   statusEffects: StatusEffect[];
 }
 
 export interface StatusEffect {
-  type: 'necromancer_buff' | 'poisoned' | 'stunned' | 'slowed' | 'aim' | 'dodge' | 'curse' | 'regen' | 'defense_up' | 'group_atk_up' | 'taunt' | 'berserk' | 'wall' | 'counter';
+  type: 'necromancer_buff' | 'poisoned' | 'stunned';
   value: number;
+  turnsLeft: number;
+}
+
+export interface MonsterEffect {
+  type: 'poisoned' | 'stunned' | 'cursed' | 'marked' | 'slowed';
+  damage?: number;         // poison dps
+  atkReduction?: number;   // curse
+  defReduction?: number;   // curse
+  damageMultiplier?: number; // mark (e.g. 1.5 = +50%)
   turnsLeft: number;
 }
 
@@ -82,7 +127,7 @@ export interface Monster {
   xpReward: number;
   coinReward: number;
   isBoss: boolean;
-  statusEffects?: StatusEffect[];
+  effects: MonsterEffect[];
 }
 
 export interface MapDefinition {
@@ -151,8 +196,47 @@ export interface Skill {
   description: string;
   mpCost: number;
   emoji: string;
+  // What the skill does
   damage?: number;
   heal?: number;
-  effect?: string;
   aoe?: boolean;
+  targetAlly?: boolean; // needs ally click to use
+  selfOnly?: boolean;   // applies to caster only
+  // Effect tags
+  effect?: SkillEffect;
+  // Effect params
+  poisonDmg?: number;
+  poisonTurns?: number;
+  stunTurns?: number;
+  defBonus?: number;
+  defBonusTurns?: number;
+  atkGroupBonus?: number;
+  atkGroupTurns?: number;
+  necroAtkBonus?: number;
+  necroBonusTurns?: number;
+  curseDef?: number;
+  curseAtk?: number;
+  curseTurns?: number;
+  markMult?: number;   // e.g. 1.6
+  markTurns?: number;
+  aimBonus?: number;
+  regenHp?: number;
+  regenTurns?: number;
+  wallTurns?: number;
+  counterPct?: number;
+  berserkAtkBonus?: number;
+  berserkDefPenalty?: number;
+  berserkTurns?: number;
+  baladaAtk?: number;
+  baladaDef?: number;
+  baladaHeal?: number;
+  reviveHpPct?: number;
+  pierceDef?: boolean; // ignores defense
 }
+
+export type SkillEffect =
+  | 'poison' | 'stun' | 'defense_up' | 'group_atk_up' | 'necro_buff'
+  | 'curse' | 'mark' | 'aim' | 'regen' | 'wall' | 'counter'
+  | 'berserk' | 'dodge' | 'balada' | 'revive' | 'aoe_heal'
+  | 'pierce' | 'ignore_half_def' | 'execute' | 'rage_scale'
+  | 'slow' | 'taunt';

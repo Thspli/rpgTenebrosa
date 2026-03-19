@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { GameState, Monster } from '@/lib/types';
+import { GameState, Monster, MonsterEffect } from '@/lib/types';
 import { CLASSES, SKILLS, MAPS } from '@/lib/gameData';
 import styles from './Combat.module.css';
 
@@ -12,65 +12,86 @@ interface Props {
   onReset: () => void;
 }
 
+type TargetMode = 'enemy' | 'ally';
+
 export default function Combat({ gameState, myId, onAction, onReset }: Props) {
   const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
-  const [selectedSkillIndex, setSelectedSkillIndex] = useState<number | null>(null);
+  const [selectedSkillIdx, setSelectedSkillIdx] = useState<number | null>(null);
+  const [targetMode, setTargetMode]   = useState<TargetMode>('enemy');
 
-  const myPlayer = gameState.players[myId];
-  const mapDef = MAPS.find(m => m.id === gameState.currentMap);
-  const isMyTurn = gameState.activePlayerId === myId;
-  const canAct = myPlayer?.isAlive && isMyTurn && gameState.phase === 'combat';
-  const aliveMonsters = gameState.currentMonsters.filter(m => m.hp > 0);
-  const activePlayer = gameState.activePlayerId ? gameState.players[gameState.activePlayerId] : null;
+  const myPlayer  = gameState.players[myId];
+  const mapDef    = MAPS.find(m => m.id === gameState.currentMap);
+  const isMyTurn  = gameState.activePlayerId === myId;
+  const canAct    = !!(myPlayer?.isAlive && isMyTurn && gameState.phase === 'combat');
+  const aliveM    = gameState.currentMonsters.filter(m => m.hp > 0);
+  const activePl  = gameState.activePlayerId ? gameState.players[gameState.activePlayerId] : null;
   const myPotions = myPlayer?.inventory.filter(i => i.consumable && (i.quantity ?? 0) > 0) ?? [];
 
-  function handleUsePotion(itemId: string) {
-    if (!canAct) return;
-    onAction({ type: 'use_potion', itemId });
+  const selectedSkill = selectedSkillIdx !== null && myPlayer
+    ? SKILLS[myPlayer.classType][selectedSkillIdx] : null;
+
+  const needsAllyTarget  = !!(selectedSkill?.targetAlly);
+  const needsEnemyTarget = !!(
+    selectedSkill &&
+    !selectedSkill.selfOnly &&
+    !selectedSkill.aoe &&
+    (selectedSkill.effect === 'aoe_heal' ? false :
+      (selectedSkill.damage !== undefined ||
+       selectedSkill.effect === 'poison' ||
+       selectedSkill.effect === 'stun'   ||
+       selectedSkill.effect === 'curse'  ||
+       selectedSkill.effect === 'mark'   ||
+       selectedSkill.effect === 'slow'))
+  );
+
+  function pickSkill(i: number) {
+    if (selectedSkillIdx === i) { setSelectedSkillIdx(null); setSelectedTarget(null); return; }
+    const sk = SKILLS[myPlayer!.classType][i];
+    const ally = !!(sk.targetAlly);
+    setSelectedSkillIdx(i);
+    setSelectedTarget(null);
+    setTargetMode(ally ? 'ally' : 'enemy');
   }
 
-  function handleAttack() {
+  function doAttack() {
     if (!canAct || !selectedTarget) return;
     onAction({ type: 'attack', targetId: selectedTarget });
     setSelectedTarget(null);
   }
 
-  function handleSkill() {
-    if (!canAct || selectedSkillIndex === null) return;
-    const skill = SKILLS[myPlayer!.classType][selectedSkillIndex];
-    const needsTarget = skill.damage !== undefined && selectedSkillIndex !== 3;
-    if (needsTarget && !selectedTarget) return;
-    onAction({ type: 'skill', skillIndex: selectedSkillIndex, targetId: selectedTarget ?? undefined });
+  function doSkill() {
+    if (!canAct || selectedSkillIdx === null) return;
+    const needsAny = needsAllyTarget || needsEnemyTarget;
+    if (needsAny && !selectedTarget) return;
+    onAction({ type: 'skill', skillIndex: selectedSkillIdx, targetId: selectedTarget ?? undefined });
+    setSelectedSkillIdx(null);
     setSelectedTarget(null);
-    setSelectedSkillIndex(null);
+    setTargetMode('enemy');
   }
 
+  // ── Defeat screen ──────────────────────────────────────────────────────────
   if (gameState.phase === 'defeat') {
     return (
       <div className={styles.endScreen}>
         <div className={styles.endCard}>
           <div className={styles.endIcon}>💀</div>
           <h2 className={styles.endTitle}>DERROTA</h2>
-          <p className={styles.endSubtitle}>
-            O grupo foi aniquilado pelas forças das trevas...
-          </p>
+          <p className={styles.endSubtitle}>O grupo foi aniquilado pelas forças das trevas...</p>
           <div className={styles.endLog}>
-            {gameState.combatLog.slice(-8).map(entry => (
-              <div key={entry.id} className={`${styles.logLine} ${styles['log_' + entry.type]}`}>
-                {entry.message}
-              </div>
+            {gameState.combatLog.slice(-8).map(e => (
+              <div key={e.id} className={`${styles.logLine} ${styles['log_' + e.type]}`}>{e.message}</div>
             ))}
           </div>
-          <button className={styles.resetBtn} onClick={onReset}>
-            🔄 Nova Partida
-          </button>
+          <button className={styles.resetBtn} onClick={onReset}>🔄 Nova Partida</button>
         </div>
       </div>
     );
   }
 
+  // ── Main combat UI ─────────────────────────────────────────────────────────
   return (
     <div className={styles.layout} style={{ '--map-bg': mapDef?.bgColor } as React.CSSProperties}>
+
       {/* Header */}
       <div className={styles.header}>
         <div className={styles.headerLeft}>
@@ -79,53 +100,63 @@ export default function Combat({ gameState, myId, onAction, onReset }: Props) {
           <span className={styles.wave}>Onda {gameState.waveNumber}</span>
         </div>
         <div className={styles.headerRight}>
-          {/* Active player indicator */}
-          {activePlayer && (
-            <span className={styles.activeTurnBadge}>
-              🎯 Vez de: {activePlayer.name} {CLASSES[activePlayer.classType].emoji}
-            </span>
+          {activePl && (
+            <span className={styles.activeTurnBadge}>🎯 Vez de: {activePl.name} {CLASSES[activePl.classType].emoji}</span>
           )}
-          {mapDef?.defenseDebuff! > 0 && (
-            <span className={styles.debuffBadge}>🛡️ -{mapDef!.defenseDebuff * 100}% DEF</span>
+          {(mapDef?.defenseDebuff ?? 0) > 0 && (
+            <span className={styles.debuffBadge}>🛡️ -{(mapDef!.defenseDebuff * 100).toFixed(0)}% DEF</span>
           )}
-          {mapDef?.manaCostMultiplier! > 1 && (
+          {(mapDef?.manaCostMultiplier ?? 1) > 1 && (
             <span className={styles.debuffBadge}>💎 MANA x{mapDef!.manaCostMultiplier}</span>
           )}
-          <span className={styles.shopCountdown}>🛒 Loja em: {gameState.shopCountdown} turno{gameState.shopCountdown !== 1 ? 's' : ''}</span>
+          <span className={styles.shopCountdown}>🛒 Loja em: {gameState.shopCountdown}t</span>
           <span className={styles.coins}>💰 {gameState.groupCoins}</span>
         </div>
       </div>
 
       {/* Main area */}
       <div className={styles.mainArea}>
+
         {/* Monsters */}
         <div className={styles.monstersSection}>
-          <h3 className={styles.sectionLabel}>⚔ Inimigos</h3>
+          <h3 className={styles.sectionLabel}>
+            ⚔ Inimigos
+            {canAct && targetMode === 'enemy' && (
+              <span style={{ fontSize: 11, color: 'var(--accent-red-bright)', marginLeft: 8, fontFamily: 'var(--font-ui)' }}>
+                ← clique para selecionar alvo
+              </span>
+            )}
+          </h3>
           <div className={styles.monsterGrid}>
             {gameState.currentMonsters.map(monster => (
               <MonsterCard
                 key={monster.id}
                 monster={monster}
                 isSelected={selectedTarget === monster.id}
-                onClick={() => monster.hp > 0 && setSelectedTarget(selectedTarget === monster.id ? null : monster.id)}
-                isDead={monster.hp <= 0}
+                canSelect={canAct && targetMode === 'enemy' && monster.hp > 0}
+                onClick={() => {
+                  if (canAct && targetMode === 'enemy' && monster.hp > 0)
+                    setSelectedTarget(prev => prev === monster.id ? null : monster.id);
+                }}
               />
             ))}
           </div>
         </div>
 
-        {/* Action Panel */}
+        {/* Action panel */}
         {myPlayer && (
           <div className={styles.actionPanel}>
+
+            {/* My status card */}
             <div className={`${styles.myStatus} ${isMyTurn ? styles.myStatusActive : ''}`}>
               <div className={styles.myNameRow}>
                 <span className={styles.myEmoji}>{CLASSES[myPlayer.classType].emoji}</span>
                 <span className={styles.myName}>{myPlayer.name}</span>
                 <span className={styles.myLevel}>Nv.{myPlayer.level}</span>
                 {!myPlayer.isAlive && <span className={styles.deadBadge}>💀 Derrotado</span>}
-                {isMyTurn && myPlayer.isAlive && <span className={styles.yourTurnBadge}>⚡ SUA VEZ!</span>}
-                {!isMyTurn && myPlayer.isAlive && activePlayer && (
-                  <span className={styles.waitingBadge}>⌛ Vez de {activePlayer.name}</span>
+                {isMyTurn && myPlayer.isAlive  && <span className={styles.yourTurnBadge}>⚡ SUA VEZ!</span>}
+                {!isMyTurn && myPlayer.isAlive && activePl && (
+                  <span className={styles.waitingBadge}>⌛ Vez de {activePl.name}</span>
                 )}
               </div>
               <StatBar value={myPlayer.hp} max={myPlayer.maxHp} color="var(--hp-color)" label="HP" />
@@ -134,100 +165,141 @@ export default function Combat({ gameState, myId, onAction, onReset }: Props) {
                 <div className={styles.xpFill} style={{ width: `${(myPlayer.xp / myPlayer.xpToNextLevel) * 100}%` }} />
               </div>
               <div className={styles.xpText}>{myPlayer.xp}/{myPlayer.xpToNextLevel} XP</div>
+
+              {/* Active buffs */}
+              <BuffBar player={myPlayer} />
             </div>
 
             {canAct && (
               <div className={styles.actions}>
+
+                {/* Target hint */}
+                {needsAllyTarget && !selectedTarget && (
+                  <div style={{ fontSize: 12, color: 'var(--accent-green-bright)', padding: '5px 10px',
+                    background: 'rgba(39,174,96,0.1)', borderRadius: 6, border: '1px solid rgba(39,174,96,0.3)' }}>
+                    💚 Selecione um aliado na barra abaixo
+                  </div>
+                )}
                 {selectedTarget && (
-                  <div className={styles.targetInfo}>
-                    🎯 Alvo: {aliveMonsters.find(m => m.id === selectedTarget)?.name ??
-                      gameState.players[selectedTarget]?.name}
+                  <div className={`${styles.targetInfo} ${targetMode === 'ally' ? styles.targetInfoAlly : ''}`}>
+                    {targetMode === 'enemy'
+                      ? `🎯 Alvo: ${aliveM.find(m => m.id === selectedTarget)?.name ?? '?'}`
+                      : `💚 Aliado: ${gameState.players[selectedTarget]?.name ?? '?'}`}
                   </div>
                 )}
 
+                {/* Attack */}
                 <button
                   className={styles.attackBtn}
-                  onClick={handleAttack}
-                  disabled={!selectedTarget || !aliveMonsters.find(m => m.id === selectedTarget)}
+                  onClick={doAttack}
+                  disabled={!selectedTarget || !aliveM.find(m => m.id === selectedTarget)}
                 >
-                  ⚔️ Atacar
+                  ⚔️ Atacar {selectedTarget && aliveM.find(m => m.id === selectedTarget)
+                    ? aliveM.find(m => m.id === selectedTarget)!.name : '(selecione inimigo)'}
                 </button>
 
                 {/* Potions */}
                 {myPotions.length > 0 && (
                   <div className={styles.potionRow}>
-                    {myPotions.map(potion => (
-                      <button
-                        key={potion.id}
-                        className={styles.potionBtn}
-                        onClick={() => handleUsePotion(potion.id)}
-                        title={potion.description}
-                      >
-                        {potion.emoji} {potion.name}
-                        <span className={styles.potionQty}>x{potion.quantity}</span>
+                    {myPotions.map(pot => (
+                      <button key={pot.id} className={styles.potionBtn}
+                        onClick={() => onAction({ type: 'use_potion', itemId: pot.id })}
+                        title={pot.description}>
+                        {pot.emoji} {pot.name}
+                        <span className={styles.potionQty}>x{pot.quantity}</span>
                       </button>
                     ))}
                   </div>
                 )}
 
+                {/* Skills */}
                 <div className={styles.skillGrid}>
                   {SKILLS[myPlayer.classType].map((skill, i) => {
-                    const mpCost = Math.ceil(skill.mpCost * (mapDef?.manaCostMultiplier ?? 1));
-                    const canUse = myPlayer.mp >= mpCost;
-                    const isSpecial = i >= 3;
+                    const cost = Math.ceil(skill.mpCost * (mapDef?.manaCostMultiplier ?? 1));
+                    const canUse = myPlayer.mp >= cost;
+                    const isAlly = !!skill.targetAlly;
                     return (
                       <button
                         key={i}
-                        className={`${styles.skillBtn} ${isSpecial ? styles.specialBtn : ''} ${selectedSkillIndex === i ? styles.skillSelected : ''}`}
-                        onClick={() => setSelectedSkillIndex(selectedSkillIndex === i ? null : i)}
+                        className={[
+                          styles.skillBtn,
+                          i >= 3 ? styles.specialBtn : '',
+                          selectedSkillIdx === i ? styles.skillSelected : '',
+                          isAlly ? styles.allySkillBtn : '',
+                        ].join(' ')}
+                        onClick={() => pickSkill(i)}
                         disabled={!canUse}
-                        title={`${skill.description} (${mpCost} MP)`}
+                        title={skill.description + (cost > 0 ? ` — ${cost} MP` : '')}
                       >
                         <span className={styles.skillEmoji}>{skill.emoji}</span>
                         <span className={styles.skillName}>{skill.name}</span>
-                        {mpCost > 0 && <span className={styles.skillMp}>{mpCost}MP</span>}
+                        {isAlly && (
+                          <span style={{ fontSize: 10, color: 'var(--accent-green-bright)',
+                            background: 'rgba(39,174,96,0.15)', padding: '1px 4px', borderRadius: 3 }}>
+                            aliado
+                          </span>
+                        )}
+                        {cost > 0 && <span className={styles.skillMp}>{cost}MP</span>}
                       </button>
                     );
                   })}
                 </div>
 
-                {selectedSkillIndex !== null && (
+                {selectedSkillIdx !== null && (
                   <button
                     className={styles.useSkillBtn}
-                    onClick={handleSkill}
+                    onClick={doSkill}
+                    disabled={(needsAllyTarget || needsEnemyTarget) && !selectedTarget}
                   >
-                    ✨ Usar: {SKILLS[myPlayer.classType][selectedSkillIndex]?.name}
+                    ✨ Usar: {selectedSkill?.name}
+                    {(needsAllyTarget || needsEnemyTarget) && !selectedTarget ? ' (selecione alvo)' : ''}
                   </button>
                 )}
               </div>
             )}
 
-            {!canAct && myPlayer.isAlive && !isMyTurn && activePlayer && (
+            {!canAct && myPlayer.isAlive && !isMyTurn && activePl && (
               <div className={styles.waitingPanel}>
-                <p>⌛ Aguardando <strong>{activePlayer.name}</strong> agir...</p>
+                <p>⌛ Aguardando <strong>{activePl.name}</strong> agir...</p>
               </div>
             )}
           </div>
         )}
       </div>
 
-      {/* All players row */}
+      {/* Players row — also ally targeting area */}
       <div className={styles.playersRow}>
         {gameState.playerOrder.map(pid => {
           const p = gameState.players[pid];
           if (!p) return null;
-          const isActive = gameState.activePlayerId === pid;
+          const isActive    = gameState.activePlayerId === pid;
+          const allySelectable = canAct && targetMode === 'ally' && needsAllyTarget;
+          const allySelected   = selectedTarget === pid && targetMode === 'ally';
           return (
             <div
               key={pid}
-              className={`${styles.playerMini} ${!p.isAlive ? styles.deadPlayer : ''} ${isActive ? styles.activePlayer : ''}`}
+              className={[
+                styles.playerMini,
+                !p.isAlive ? styles.deadPlayer : '',
+                isActive ? styles.activePlayer : '',
+                allySelected ? styles.allySelectedPlayer : '',
+                allySelectable ? styles.allySelectable : '',
+              ].join(' ')}
+              onClick={() => allySelectable && setSelectedTarget(prev => prev === pid ? null : pid)}
             >
               <div className={styles.miniHeader}>
                 <span>{CLASSES[p.classType].emoji}</span>
                 <span className={styles.miniName}>{p.name}</span>
                 {pid === myId && <span className={styles.youTag}>você</span>}
-                {isActive && p.isAlive && <span className={styles.activeDot} title="Vez dele" />}
+                {isActive && p.isAlive && <span className={styles.activeDot} />}
                 {!p.isAlive && <span>💀</span>}
+                {/* Buff icons */}
+                {p.buffs.wallTurnsLeft > 0         && <span title="Muralha">🏰</span>}
+                {p.buffs.dodgeTurnsLeft > 0         && <span title="Esquiva">💨</span>}
+                {p.buffs.regenTurnsLeft > 0         && <span title="Regenerando">♻️</span>}
+                {p.buffs.tempBonusTurns > 0         && <span title="Buff ATK/DEF">✨</span>}
+                {p.buffs.necroBonusTurnsLeft > 0    && <span title="Buff Necromante">💀</span>}
+                {p.buffs.counterReflect > 0         && <span title="Contra-Ataque">🔄</span>}
               </div>
               <SmallBar value={p.hp} max={p.maxHp} color="var(--hp-color)" />
               <SmallBar value={p.mp} max={p.maxMp} color="var(--mp-color)" />
@@ -240,9 +312,9 @@ export default function Combat({ gameState, myId, onAction, onReset }: Props) {
       <div className={styles.logPanel}>
         <div className={styles.logTitle}>📜 Log de Combate</div>
         <div className={styles.logScroll}>
-          {gameState.combatLog.slice().reverse().slice(0, 20).map(entry => (
-            <div key={entry.id} className={`${styles.logLine} ${styles['log_' + entry.type]}`}>
-              <span className={styles.logTurn}>[T{entry.turn}]</span> {entry.message}
+          {gameState.combatLog.slice().reverse().slice(0, 25).map(e => (
+            <div key={e.id} className={`${styles.logLine} ${styles['log_' + e.type]}`}>
+              <span className={styles.logTurn}>[T{e.turn}]</span> {e.message}
             </div>
           ))}
         </div>
@@ -251,13 +323,28 @@ export default function Combat({ gameState, myId, onAction, onReset }: Props) {
   );
 }
 
-function MonsterCard({ monster, isSelected, onClick, isDead }: {
-  monster: Monster; isSelected: boolean; onClick: () => void; isDead: boolean;
+// ── MonsterCard ────────────────────────────────────────────────────────────────
+function MonsterCard({ monster, isSelected, canSelect, onClick }: {
+  monster: Monster; isSelected: boolean; canSelect: boolean; onClick: () => void;
 }) {
-  const hpPct = (monster.hp / monster.maxHp) * 100;
+  const hp = (monster.hp / monster.maxHp) * 100;
+  const eff = monster.effects ?? [];
+  const poisoned = eff.some((e: MonsterEffect) => e.type === 'poisoned');
+  const stunned  = eff.some((e: MonsterEffect) => e.type === 'stunned');
+  const cursed   = eff.some((e: MonsterEffect) => e.type === 'cursed');
+  const marked   = eff.some((e: MonsterEffect) => e.type === 'marked');
+  const slowed   = eff.some((e: MonsterEffect) => e.type === 'slowed');
+  const isDead   = monster.hp <= 0;
+
   return (
     <div
-      className={`${styles.monsterCard} ${isSelected ? styles.monsterSelected : ''} ${isDead ? styles.monsterDead : ''} ${monster.isBoss ? styles.bossCard : ''}`}
+      className={[
+        styles.monsterCard,
+        isSelected ? styles.monsterSelected : '',
+        isDead      ? styles.monsterDead    : '',
+        monster.isBoss ? styles.bossCard   : '',
+        canSelect && !isDead ? styles.monsterHoverable : '',
+      ].join(' ')}
       onClick={isDead ? undefined : onClick}
     >
       {monster.isBoss && <div className={styles.bossBadge}>BOSS</div>}
@@ -265,20 +352,59 @@ function MonsterCard({ monster, isSelected, onClick, isDead }: {
       <div className={styles.monsterName}>{monster.name}</div>
       <div className={styles.monsterLv}>Nv.{monster.level}</div>
       <div className={styles.monsterHpTrack}>
-        <div
-          className={styles.monsterHpFill}
-          style={{
-            width: `${hpPct}%`,
-            background: hpPct > 50 ? 'var(--accent-green)' : hpPct > 25 ? '#f39c12' : 'var(--accent-red)',
-          }}
-        />
+        <div className={styles.monsterHpFill} style={{
+          width: `${hp}%`,
+          background: hp > 50 ? 'var(--accent-green)' : hp > 25 ? '#f39c12' : 'var(--accent-red)',
+        }} />
       </div>
       <div className={styles.monsterHpText}>{monster.hp}/{monster.maxHp}</div>
       <div className={styles.monsterStats}>⚔{monster.attack} 🛡{monster.defense}</div>
+      {/* Status icons */}
+      {(poisoned || stunned || cursed || marked || slowed) && (
+        <div style={{ display: 'flex', gap: 3, justifyContent: 'center', marginTop: 4, flexWrap: 'wrap' }}>
+          {poisoned && <span title={`Envenenado (${eff.find(e=>e.type==='poisoned')?.turnsLeft}t)`}>☠️</span>}
+          {stunned  && <span title={`Atordoado (${eff.find(e=>e.type==='stunned')?.turnsLeft}t)`}>😵</span>}
+          {cursed   && <span title={`Amaldiçoado (${eff.find(e=>e.type==='cursed')?.turnsLeft}t)`}>🔮</span>}
+          {marked   && <span title={`Marcado ×${eff.find(e=>e.type==='marked')?.damageMultiplier?.toFixed(1)} (${eff.find(e=>e.type==='marked')?.turnsLeft}t)`}>🎯</span>}
+          {slowed   && <span title={`Lento (${eff.find(e=>e.type==='slowed')?.turnsLeft}t)`}>❄️</span>}
+        </div>
+      )}
     </div>
   );
 }
 
+// ── BuffBar ────────────────────────────────────────────────────────────────────
+function BuffBar({ player }: { player: GameState['players'][string] }) {
+  const b = player.buffs;
+  const chips: { label: string; color: string; bg: string }[] = [];
+
+  if (b.tempBonusTurns > 0) {
+    if (b.tempAtkBonus > 0)  chips.push({ label: `⚔️+${b.tempAtkBonus}atk (${b.tempBonusTurns}t)`, color: '#f0c040', bg: 'rgba(212,160,23,.15)' });
+    if (b.tempDefBonus > 0)  chips.push({ label: `🛡️+${b.tempDefBonus}def (${b.tempBonusTurns}t)`, color: '#3498db', bg: 'rgba(52,152,219,.15)' });
+    if (b.tempDefBonus < 0)  chips.push({ label: `🛡️${b.tempDefBonus}def (${b.tempBonusTurns}t)`, color: '#e74c3c', bg: 'rgba(231,76,60,.15)' });
+  }
+  if (b.regenTurnsLeft > 0)     chips.push({ label: `♻️+${b.regenHpPerTurn}hp/t (${b.regenTurnsLeft}t)`, color: '#2ecc71', bg: 'rgba(39,174,96,.15)' });
+  if (b.wallTurnsLeft > 0)      chips.push({ label: `🏰 Muralha (${b.wallTurnsLeft}t)`,             color: '#bdc3c7', bg: 'rgba(127,140,141,.2)' });
+  if (b.dodgeTurnsLeft > 0)     chips.push({ label: `💨 Esquiva (${b.dodgeTurnsLeft}t)`,             color: '#1abc9c', bg: 'rgba(26,188,156,.15)' });
+  if (b.necroBonusTurnsLeft > 0)chips.push({ label: `💀+${b.necroBonusDmg}dmg (${b.necroBonusTurnsLeft}t)`, color: '#9b59b6', bg: 'rgba(142,68,173,.15)' });
+  if (b.aimBonus > 0)           chips.push({ label: `🦅 Mira+${b.aimBonus}`,                        color: '#3498db', bg: 'rgba(52,152,219,.15)' });
+  if (b.counterReflect > 0)     chips.push({ label: `🔄 Contra-atk ${Math.round(b.counterReflect*100)}%`, color: '#e67e22', bg: 'rgba(230,126,34,.15)' });
+
+  if (chips.length === 0) return null;
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
+      {chips.map((c, i) => (
+        <span key={i} style={{
+          fontSize: 11, padding: '2px 6px', borderRadius: 4,
+          color: c.color, background: c.bg, border: `1px solid ${c.color}55`,
+          fontFamily: 'var(--font-ui)',
+        }}>{c.label}</span>
+      ))}
+    </div>
+  );
+}
+
+// ── Misc ───────────────────────────────────────────────────────────────────────
 function StatBar({ value, max, color, label }: { value: number; max: number; color: string; label: string }) {
   return (
     <div className={styles.statBarRow}>

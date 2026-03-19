@@ -624,3 +624,31 @@
   transform: translateY(-1px);
   box-shadow: var(--glow-gold);
 }
+/* ─── ADD THESE LINES TO THE END OF src/components/Combat.module.css ─── */
+
+/* Ally targeting */
+.targetInfoAlly {
+  color: var(--accent-green-bright) !important;
+  background: rgba(39,174,96,0.1) !important;
+  border: 1px solid rgba(39,174,96,0.3) !important;
+}
+
+.allySkillBtn {
+  border-color: rgba(39,174,96,0.35) !important;
+  background: rgba(39,174,96,0.05) !important;
+}
+.allySkillBtn:hover:not(:disabled) {
+  border-color: var(--accent-green) !important;
+  color: var(--accent-green-bright) !important;
+  background: rgba(39,174,96,0.12) !important;
+}
+
+.allySelectable { cursor: pointer; }
+.allySelectable:hover { border-color: var(--accent-green) !important; }
+
+.allySelectedPlayer {
+  border-color: var(--accent-green-bright) !important;
+  box-shadow: 0 0 0 2px rgba(39,174,96,0.35) !important;
+}
+
+.monsterHoverable { cursor: pointer; }
