@@ -36,6 +36,8 @@
     "next.config.js"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "types/validator.ts"
   ]
 }
+  
