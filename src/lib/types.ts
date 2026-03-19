@@ -99,9 +99,9 @@ export type GamePhase =
   | 'lobby'
   | 'class_selection'
   | 'map_selection'
-  | 'shopping'
+  | 'shopping'           // pre-combat shop or mid-combat break
   | 'combat'
-  | 'victory'
+  | 'victory_shopping'   // post-boss shop before next map
   | 'defeat';
 
 export type TurnPhase = 'player_turns' | 'processing' | 'monster_turns' | 'broadcast';

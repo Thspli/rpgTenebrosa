@@ -510,17 +510,17 @@ function checkBattleEnd(state: GameState): void {
     const hadBoss = state.currentMonsters.some(m => m.isBoss);
 
     if (hadBoss && !state.bossDefeated) {
-      // Boss wave cleared — victory!
       state.bossDefeated = true;
 
+      // Unlock next map
       const nextMapId = (state.currentMap + 1) as MapId;
       if (nextMapId <= 7 && !state.unlockedMaps.includes(nextMapId)) {
         state.unlockedMaps.push(nextMapId);
         const nextMap = MAPS.find(m => m.id === nextMapId);
-        addLog(state, `🗺️ Mapa ${nextMap?.theme} ${nextMap?.name} desbloqueado!`, 'system');
+        addLog(state, `🗺️ Mapa ${nextMap?.theme} ${nextMap?.name} desbloqueado!`, 'level_up');
       }
 
-      // Unlock classes based on map cleared
+      // Unlock classes
       if (state.currentMap >= 1 && !state.unlockedClasses.includes('paladin')) {
         state.unlockedClasses.push('paladin');
         addLog(state, `🛡️ Classe PALADINO desbloqueada!`, 'level_up');
@@ -530,27 +530,77 @@ function checkBattleEnd(state: GameState): void {
         addLog(state, `🏹 Classe ARQUEIRO desbloqueada!`, 'level_up');
       }
 
-      // Bonus coins for boss kill
+      // Big XP bonus for boss kill — trigger level ups
+      const bossXpBonus = mapDef.boss.xpReward;
       Object.keys(state.players).forEach(pid => {
-        state.players[pid] = { ...state.players[pid], coins: state.players[pid].coins + 50 };
+        const p = state.players[pid];
+        let updated = { ...p, xp: p.xp + bossXpBonus, coins: p.coins + 80 };
+        // Apply level ups in loop (could be multiple)
+        let tries = 0;
+        while (updated.xp >= updated.xpToNextLevel && tries < 5) {
+          const result = levelUp(updated);
+          if (result.didLevelUp) {
+            addLog(state, `🎉 ${updated.name} subiu para Nível ${result.player.level}!`, 'level_up');
+            updated = result.player;
+          }
+          tries++;
+        }
+        state.players[pid] = updated;
       });
-      addLog(state, `💰 +50 moedas de bônus por derrotar o Boss!`, 'level_up');
 
-      state.phase = 'victory';
-      addLog(state, `🏆 VITÓRIA! O ${mapDef.theme} ${mapDef.name} foi conquistado!`, 'system');
+      addLog(state, `💰 +80 moedas e XP de bônus por derrotar o Boss!`, 'level_up');
+      addLog(state, `🏆 VITÓRIA! ${mapDef.theme} ${mapDef.name} conquistado! Vá à loja e prepare-se para o próximo mapa.`, 'system');
+
+      // Go to victory shopping instead of a dead-end screen
+      state.phase = 'victory_shopping';
 
     } else if (!hadBoss) {
-      // Regular wave cleared — spawn boss now
+      // Regular wave — spawn boss
       addLog(state, `💥 Onda limpa! O BOSS aparece!`, 'system');
       state.currentMonsters = [{ ...mapDef.boss, id: nanoid(), hp: mapDef.boss.maxHp }];
       state.actionsThisTurn = {};
-
       const firstAlive = state.playerOrder.find(pid => state.players[pid]?.isAlive);
       state.activePlayerId = firstAlive ?? null;
       if (firstAlive) addLog(state, `🎯 Vez de ${state.players[firstAlive].name} agir!`, 'system');
     }
-    // If hadBoss && bossDefeated is already true, do nothing (shouldn't happen)
   }
+}
+
+// Called when players click "Próximo Mapa" after victory shopping
+export function proceedToNextMap(state: GameState): GameState {
+  const nextMapId = (state.currentMap + 1) as MapId;
+
+  if (nextMapId > 7) {
+    // All maps cleared — show final victory
+    addLog(state, `🌟 PARABÉNS! Você conquistou todos os mapas! O reino está salvo!`, 'level_up');
+    state.phase = 'defeat'; // reuse defeat screen with custom message — or keep as shopping
+    return { ...state };
+  }
+
+  // Heal all players partially (50% HP, full MP) before next map
+  Object.keys(state.players).forEach(pid => {
+    const p = state.players[pid];
+    state.players[pid] = {
+      ...p,
+      hp: Math.max(p.hp, Math.floor(p.maxHp * 0.5)),
+      mp: p.maxMp,
+      isAlive: true,
+    };
+  });
+
+  state.currentMap = nextMapId;
+  state.phase = 'map_selection';
+  state.bossDefeated = false;
+  state.waveNumber = 0;
+  state.currentMonsters = [];
+  state.actionsThisTurn = {};
+  state.activePlayerId = null;
+
+  const nextMap = MAPS.find(m => m.id === nextMapId)!;
+  addLog(state, `🗺️ Avançando para ${nextMap.theme} ${nextMap.name}!`, 'system');
+  addLog(state, `💚 HP restaurado a 50%. MP restaurado a 100%.`, 'system');
+
+  return { ...state };
 }
 
 export function resetRoom(roomId: string): void {

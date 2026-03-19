@@ -161,6 +161,37 @@
   gap: 16px;
 }
 
+.victoryBanner {
+  font-family: var(--font-display);
+  font-size: 18px;
+  color: var(--accent-gold-bright);
+  text-shadow: 0 0 20px rgba(212,160,23,0.5);
+  margin-bottom: 8px;
+  letter-spacing: 0.08em;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.nextMapBtn {
+  padding: 14px 28px;
+  background: linear-gradient(135deg, #1a6b2a, #27ae60);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-transform: uppercase;
+}
+
+.nextMapBtn:hover {
+  background: linear-gradient(135deg, #27ae60, #2ecc71);
+  transform: translateY(-1px);
+  box-shadow: 0 0 20px rgba(39,174,96,0.4);
+}
+
 .startBtn {
   padding: 14px 28px;
   background: linear-gradient(135deg, #8b2020, #c0392b);

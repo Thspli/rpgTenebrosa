@@ -43,7 +43,7 @@ export default function GamePage() {
     );
   }
 
-  if (phase === 'map_selection' || phase === 'shopping') {
+  if (phase === 'map_selection' || phase === 'shopping' || phase === 'victory_shopping') {
     return (
       <MapAndShop
         gameState={gameState}
@@ -52,11 +52,12 @@ export default function GamePage() {
         onBuyItem={(itemId: string) => emit('buy_item', { itemId })}
         onStartCombat={() => emit('start_combat')}
         onContinueCombat={() => emit('continue_combat')}
+        onProceedToNextMap={() => emit('proceed_to_next_map')}
       />
     );
   }
 
-  if (phase === 'combat' || phase === 'victory' || phase === 'defeat') {
+  if (phase === 'combat' || phase === 'defeat') {
     return (
       <Combat
         gameState={gameState}

@@ -39,16 +39,14 @@ export default function Combat({ gameState, myId, onAction, onReset }: Props) {
     setSelectedSkillIndex(null);
   }
 
-  if (gameState.phase === 'victory' || gameState.phase === 'defeat') {
+  if (gameState.phase === 'defeat') {
     return (
       <div className={styles.endScreen}>
         <div className={styles.endCard}>
-          <div className={styles.endIcon}>{gameState.phase === 'victory' ? '🏆' : '💀'}</div>
-          <h2 className={styles.endTitle}>{gameState.phase === 'victory' ? 'VITÓRIA!' : 'DERROTA'}</h2>
+          <div className={styles.endIcon}>💀</div>
+          <h2 className={styles.endTitle}>DERROTA</h2>
           <p className={styles.endSubtitle}>
-            {gameState.phase === 'victory'
-              ? `O grupo conquistou ${mapDef?.name}! Novas recompensas foram desbloqueadas.`
-              : 'O grupo foi aniquilado pelas forças das trevas...'}
+            O grupo foi aniquilado pelas forças das trevas...
           </p>
           <div className={styles.endLog}>
             {gameState.combatLog.slice(-8).map(entry => (

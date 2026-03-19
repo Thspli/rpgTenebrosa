@@ -12,6 +12,7 @@ import {
   startCombat,
   continueCombat,
   processPlayerAction,
+  proceedToNextMap,
   saveRoom,
   resetRoom,
 } from '@/lib/gameEngine';
@@ -110,6 +111,14 @@ export default function handler(req: NextApiRequest, res: NextApiResponseWithSoc
     socket.on('player_action', (action: { type: string; targetId?: string; skillIndex?: number; itemId?: string }) => {
       let state = getOrCreateRoom(ROOM_ID);
       state = processPlayerAction(state, socket.id, action);
+      saveRoom(state);
+      io.to(ROOM_ID).emit('game_state', state);
+    });
+
+    // After victory shop, go to next map
+    socket.on('proceed_to_next_map', () => {
+      let state = getOrCreateRoom(ROOM_ID);
+      state = proceedToNextMap(state);
       saveRoom(state);
       io.to(ROOM_ID).emit('game_state', state);
     });

@@ -11,12 +11,17 @@ interface Props {
   onBuyItem: (itemId: string) => void;
   onStartCombat: () => void;
   onContinueCombat: () => void;
+  onProceedToNextMap: () => void;
 }
 
-export default function MapAndShop({ gameState, myId, onSelectMap, onBuyItem, onStartCombat, onContinueCombat }: Props) {
+export default function MapAndShop({ gameState, myId, onSelectMap, onBuyItem, onStartCombat, onContinueCombat, onProceedToNextMap }: Props) {
   const myPlayer = gameState.players[myId];
   const phase = gameState.phase;
   const isMidCombatShop = phase === 'shopping' && gameState.turn > 0;
+  const isVictoryShop = phase === 'victory_shopping';
+  const currentMap = MAPS.find(m => m.id === gameState.currentMap);
+  const nextMapId = (gameState.currentMap + 1) as MapId;
+  const nextMap = MAPS.find(m => m.id === nextMapId);
 
   return (
     <div className={styles.container}>
@@ -68,16 +73,21 @@ export default function MapAndShop({ gameState, myId, onSelectMap, onBuyItem, on
         </div>
       )}
 
-      {phase === 'shopping' && (
+      {(phase === 'shopping' || phase === 'victory_shopping') && (
         <div className={styles.shopSection}>
           <div className={styles.shopHeader}>
             <div>
+              {isVictoryShop && (
+                <div className={styles.victoryBanner}>
+                  🏆 VITÓRIA! {currentMap?.theme} {currentMap?.name} conquistado!
+                </div>
+              )}
               <h2 className={styles.sectionTitle}>
-                {isMidCombatShop ? '⚔️ Pausa de Combate — Loja' : '🛒 Loja do Aventureiro'}
+                {isVictoryShop ? '🛒 Loja Pós-Vitória' : isMidCombatShop ? '⚔️ Pausa de Combate — Loja' : '🛒 Loja do Aventureiro'}
               </h2>
               <p className={styles.hint}>
-                Mapa: {MAPS.find(m => m.id === gameState.currentMap)?.name} |
-                Turno: {gameState.turn} |
+                Mapa: {currentMap?.name} |
+                {gameState.turn > 0 && ` Turno: ${gameState.turn} |`}
                 Moedas do grupo: <span className={styles.coins}>💰 {gameState.groupCoins}</span>
               </p>
               {isMidCombatShop && (
@@ -85,13 +95,23 @@ export default function MapAndShop({ gameState, myId, onSelectMap, onBuyItem, on
                   ⚠️ Após a loja, o combate continua por mais 3 turnos antes da próxima pausa.
                 </p>
               )}
+              {isVictoryShop && nextMap && (
+                <p className={styles.shopWarning} style={{ borderColor: 'rgba(39,174,96,0.4)', color: 'var(--accent-green-bright)', background: 'rgba(39,174,96,0.08)' }}>
+                  ➡️ Próximo mapa: {nextMap.theme} {nextMap.name} ({nextMap.difficulty})
+                </p>
+              )}
+              {isVictoryShop && !nextMap && (
+                <p className={styles.shopWarning} style={{ borderColor: 'rgba(212,160,23,0.4)', color: 'var(--accent-gold-bright)', background: 'rgba(212,160,23,0.08)' }}>
+                  🌟 Você completou todos os mapas disponíveis!
+                </p>
+              )}
             </div>
 
             <button
-              className={styles.startBtn}
-              onClick={isMidCombatShop ? onContinueCombat : onStartCombat}
+              className={isVictoryShop ? styles.nextMapBtn : styles.startBtn}
+              onClick={isVictoryShop ? onProceedToNextMap : isMidCombatShop ? onContinueCombat : onStartCombat}
             >
-              {isMidCombatShop ? '⚔️ Continuar Combate!' : '⚔️ Iniciar Combate!'}
+              {isVictoryShop ? (nextMap ? `➡️ Ir para ${nextMap.name}` : '🌟 Fim de Jogo') : isMidCombatShop ? '⚔️ Continuar Combate!' : '⚔️ Iniciar Combate!'}
             </button>
           </div>
 
