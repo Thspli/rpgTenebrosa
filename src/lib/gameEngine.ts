@@ -474,7 +474,7 @@ function processMonsterTurns(state: GameState): void {
 
   // Check battle end
   checkBattleEnd(state);
-  if (state.phase === 'victory' || state.phase === 'defeat' || state.phase === 'shopping') return;
+  if (state.phase === 'victory_shopping' || state.phase === 'defeat' || state.phase === 'shopping') return;
 
   // Shop break every 3 turns
   if (state.shopCountdown <= 0) {
