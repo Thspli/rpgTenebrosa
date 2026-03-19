@@ -65,7 +65,7 @@ export interface Player {
 }
 
 export interface StatusEffect {
-  type: 'necromancer_buff' | 'poisoned' | 'stunned';
+  type: 'necromancer_buff' | 'poisoned' | 'stunned' | 'slowed' | 'aim' | 'dodge' | 'curse' | 'regen' | 'defense_up' | 'group_atk_up' | 'taunt' | 'berserk' | 'wall' | 'counter';
   value: number;
   turnsLeft: number;
 }

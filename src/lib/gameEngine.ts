@@ -365,6 +365,12 @@ export function processPlayerAction(
     if (activeNecroBuff?.necromancerBuff) {
       bonus += activeNecroBuff.necromancerBuff.damage;
     }
+    // Apply aim
+    const aimEffect = player.statusEffects?.find(e => e.type === 'aim');
+    if (aimEffect) {
+      bonus += aimEffect.value;
+      player.statusEffects = player.statusEffects?.filter(e => e !== aimEffect);
+    }
 
     const damage = calculateDamage(player.attack, target.defense, dice, bonus);
     const monsterIdx = state.currentMonsters.findIndex(m => m.id === action.targetId);
@@ -479,6 +485,100 @@ export function processPlayerAction(
         addLog(state, `${player.name} envenena ${targetMonster.emoji}${targetMonster.name}! Dano de veneno por 3 turnos.`, 'player_action');
       }
     }
+
+    if (skill.effect === 'stun' && action.targetId) {
+      const targetMonster = state.currentMonsters.find(m => m.id === action.targetId && m.hp > 0);
+      if (targetMonster) {
+        const effect: StatusEffect = { type: 'stunned', value: 0, turnsLeft: 1 };
+        const existing = targetMonster.statusEffects || [];
+        existing.push(effect);
+        state.currentMonsters[state.currentMonsters.findIndex(m => m.id === action.targetId)] = { ...targetMonster, statusEffects: existing };
+        addLog(state, `${player.name} atordoa ${targetMonster.emoji}${targetMonster.name}! Atordoado por 1 turno.`, 'player_action');
+      }
+    }
+
+    if (skill.effect === 'slow' && action.targetId) {
+      const targetMonster = state.currentMonsters.find(m => m.id === action.targetId && m.hp > 0);
+      if (targetMonster) {
+        const effect: StatusEffect = { type: 'slowed', value: 2, turnsLeft: 2 };
+        const existing = targetMonster.statusEffects || [];
+        existing.push(effect);
+        state.currentMonsters[state.currentMonsters.findIndex(m => m.id === action.targetId)] = { ...targetMonster, statusEffects: existing };
+        addLog(state, `${player.name} lentifica ${targetMonster.emoji}${targetMonster.name}! Ataque reduzido por 2 turnos.`, 'player_action');
+      }
+    }
+
+    if (skill.effect === 'curse' && action.targetId) {
+      const targetMonster = state.currentMonsters.find(m => m.id === action.targetId && m.hp > 0);
+      if (targetMonster) {
+        const effect: StatusEffect = { type: 'curse', value: 3, turnsLeft: 3 };
+        const existing = targetMonster.statusEffects || [];
+        existing.push(effect);
+        state.currentMonsters[state.currentMonsters.findIndex(m => m.id === action.targetId)] = { ...targetMonster, statusEffects: existing };
+        addLog(state, `${player.name} amaldiçoa ${targetMonster.emoji}${targetMonster.name}! ATK/DEF reduzidos por 3 turnos.`, 'player_action');
+      }
+    }
+
+    if (skill.effect === 'aim') {
+      updatedPlayer.statusEffects = updatedPlayer.statusEffects || [];
+      updatedPlayer.statusEffects.push({ type: 'aim', value: 10, turnsLeft: 1 });
+      addLog(state, `${player.name} mira cuidadosamente! Próximo ataque +10 dano.`, 'player_action');
+    }
+
+    if (skill.effect === 'dodge') {
+      updatedPlayer.statusEffects = updatedPlayer.statusEffects || [];
+      updatedPlayer.statusEffects.push({ type: 'dodge', value: 0, turnsLeft: 1 });
+      addLog(state, `${player.name} se prepara para esquivar! Próximo ataque inimigo falha.`, 'player_action');
+    }
+
+    if (skill.effect === 'regen' && action.targetId && state.players[action.targetId]) {
+      const targetPlayer = state.players[action.targetId];
+      state.players[action.targetId] = {
+        ...targetPlayer,
+        statusEffects: [...(targetPlayer.statusEffects || []), { type: 'regen', value: 10, turnsLeft: 3 }]
+      };
+      addLog(state, `${player.name} regenera ${targetPlayer.name}! +10HP por turno por 3 turnos.`, 'player_action');
+    }
+
+    if (skill.effect === 'defense_up') {
+      updatedPlayer.statusEffects = updatedPlayer.statusEffects || [];
+      updatedPlayer.statusEffects.push({ type: 'defense_up', value: skill.mpCost === 15 ? 5 : 6, turnsLeft: 1 });
+      addLog(state, `${player.name} aumenta defesa! +${skill.mpCost === 15 ? 5 : 6} DEF por 1 turno.`, 'player_action');
+    }
+
+    if (skill.effect === 'group_atk_up') {
+      Object.keys(state.players).forEach(pid => {
+        if (state.players[pid].isAlive) {
+          state.players[pid].statusEffects = state.players[pid].statusEffects || [];
+          state.players[pid].statusEffects.push({ type: 'group_atk_up', value: skill.mpCost === 20 ? 4 : 3, turnsLeft: 2 });
+        }
+      });
+      addLog(state, `${player.name} buffa o grupo! +${skill.mpCost === 20 ? 4 : 3} ATK para todos por 2 turnos.`, 'player_action');
+    }
+
+    if (skill.effect === 'taunt') {
+      updatedPlayer.statusEffects = updatedPlayer.statusEffects || [];
+      updatedPlayer.statusEffects.push({ type: 'taunt', value: 0, turnsLeft: 1 });
+      addLog(state, `${player.name} provoca os inimigos! Todos atacam ele por 1 turno.`, 'player_action');
+    }
+
+    if (skill.effect === 'berserk') {
+      updatedPlayer.statusEffects = updatedPlayer.statusEffects || [];
+      updatedPlayer.statusEffects.push({ type: 'berserk', value: 5, turnsLeft: 2 });
+      addLog(state, `${player.name} entra em frenesi! +5 ATK, -3 DEF por 2 turnos.`, 'player_action');
+    }
+
+    if (skill.effect === 'wall') {
+      updatedPlayer.statusEffects = updatedPlayer.statusEffects || [];
+      updatedPlayer.statusEffects.push({ type: 'wall', value: 0, turnsLeft: 1 });
+      addLog(state, `${player.name} ergue uma muralha! Grupo imune a dano por 1 turno.`, 'player_action');
+    }
+
+    if (skill.effect === 'counter') {
+      updatedPlayer.statusEffects = updatedPlayer.statusEffects || [];
+      updatedPlayer.statusEffects.push({ type: 'counter', value: 50, turnsLeft: 1 });
+      addLog(state, `${player.name} se prepara para contra-atacar! Reflete 50% do próximo dano.`, 'player_action');
+    }
   }
 
   state.players[playerId] = updatedPlayer;
@@ -530,14 +630,65 @@ function processMonsterTurns(state: GameState): void {
   aliveMonsters.forEach(monster => {
     if (alivePlayers.length === 0) return;
 
+    // Check for stun
+    const stunEffect = monster.statusEffects?.find(e => e.type === 'stunned');
+    if (stunEffect) {
+      addLog(state, `${monster.emoji}${monster.name} está atordoado e pula o turno!`, 'monster_action');
+      monster.statusEffects = monster.statusEffects?.filter(e => e !== stunEffect);
+      return;
+    }
+
     const attackCount = monster.isBoss ? 2 + Math.floor(Math.random() * 2) : 1; // Bosses attack 2-3 times
     for (let i = 0; i < attackCount; i++) {
       if (alivePlayers.length === 0) break;
-      const target = alivePlayers[Math.floor(Math.random() * alivePlayers.length)];
+
+      // Check for taunt
+      const tauntingPlayer = alivePlayers.find(p => p.statusEffects?.some(e => e.type === 'taunt'));
+      const target = tauntingPlayer || alivePlayers[Math.floor(Math.random() * alivePlayers.length)];
+
+      // Check for dodge
+      const dodgeEffect = target.statusEffects?.find(e => e.type === 'dodge');
+      if (dodgeEffect) {
+        addLog(state, `${target.name} esquiva do ataque de ${monster.emoji}${monster.name}!`, 'monster_action');
+        // Remove dodge effect
+        target.statusEffects = target.statusEffects?.filter(e => e !== dodgeEffect);
+        continue;
+      }
+
+      // Check for wall
+      const wallEffect = alivePlayers.find(p => p.statusEffects?.some(e => e.type === 'wall'));
+      if (wallEffect) {
+        addLog(state, `🏰 Muralha de ${wallEffect.name} bloqueia o ataque de ${monster.emoji}${monster.name}!`, 'monster_action');
+        // Remove wall effect
+        wallEffect.statusEffects = wallEffect.statusEffects?.filter(e => e.type !== 'wall');
+        continue;
+      }
+
       const dice = rollDice();
       const mapDef = MAPS.find(m => m.id === state.currentMap)!;
+      let monsterAttack = monster.attack;
+      // Apply slowed
+      const slowEffect = monster.statusEffects?.find(e => e.type === 'slowed');
+      if (slowEffect) {
+        monsterAttack -= slowEffect.value;
+      }
+      // Apply curse
+      const curseEffect = monster.statusEffects?.find(e => e.type === 'curse');
+      if (curseEffect) {
+        monsterAttack -= curseEffect.value;
+      }
       const effectiveDef = Math.floor(target.defense * (1 - mapDef.defenseDebuff));
-      const damage = calculateDamage(monster.attack, effectiveDef, dice);
+      const damage = calculateDamage(monsterAttack, effectiveDef, dice);
+
+      // Check for counter
+      const counterEffect = target.statusEffects?.find(e => e.type === 'counter');
+      if (counterEffect) {
+        const reflectDamage = Math.floor(damage * (counterEffect.value / 100));
+        monster.hp = Math.max(0, monster.hp - reflectDamage);
+        addLog(state, `${target.name} contra-ataca! ${monster.emoji}${monster.name} sofre ${reflectDamage} dano refletido!`, 'monster_action');
+        // Remove counter effect
+        target.statusEffects = target.statusEffects?.filter(e => e !== counterEffect);
+      }
 
       state.players[target.id] = {
         ...state.players[target.id],
@@ -567,7 +718,7 @@ function processMonsterTurns(state: GameState): void {
       effect.turnsLeft -= 1;
       return effect.turnsLeft > 0;
     });
-    return { ...monster, hp: Math.max(0, newHp), statusEffects: newEffects.length > 0 ? newEffects : undefined };
+    return { ...monster, hp: Math.max(0, newHp), statusEffects: newEffects };
   });
 
   // Tick necromancer buffs
@@ -594,6 +745,41 @@ function processMonsterTurns(state: GameState): void {
     }
   });
   addLog(state, `💎 Regeneração de Mana! +10% MP para todos.`, 'system');
+
+  // Apply and tick player status effects
+  Object.keys(state.players).forEach(pid => {
+    const p = state.players[pid];
+    if (!p.isAlive) return;
+    const effects = p.statusEffects || [];
+    let newHp = p.hp;
+    let newAttack = p.baseAttack;
+    let newDefense = p.baseDefense;
+    const newEffects = effects.filter(effect => {
+      if (effect.type === 'regen') {
+        newHp = Math.min(p.maxHp, newHp + effect.value);
+        addLog(state, `${p.name} regenera ${effect.value} HP!`, 'system');
+      }
+      if (effect.type === 'defense_up') {
+        newDefense += effect.value;
+      }
+      if (effect.type === 'group_atk_up') {
+        newAttack += effect.value;
+      }
+      if (effect.type === 'berserk') {
+        newAttack += effect.value;
+        newDefense -= 3;
+      }
+      effect.turnsLeft -= 1;
+      return effect.turnsLeft > 0;
+    });
+    state.players[pid] = {
+      ...p,
+      hp: newHp,
+      attack: newAttack,
+      defense: newDefense,
+      statusEffects: newEffects,
+    };
+  });
 
   // Advance turn counter
   state.turn += 1;
