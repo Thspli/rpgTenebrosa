@@ -73,16 +73,13 @@ export function selectClass(state: GameState, playerId: string, classType: Class
   if (!state.players[playerId] || !state.unlockedClasses.includes(classType)) return state;
   const old = state.players[playerId];
   
-  // Build fresh player with class base stats
   const p = createPlayer(playerId, old.name, classType);
   p.isReady = false;
   p.coins = old.coins;
-  // Preserve level and XP
   p.level = old.level;
   p.xp = old.xp;
   p.xpToNextLevel = old.xpToNextLevel;
   
-  // Apply level scaling — use the NEW class's base stats
   const cls = CLASSES[classType];
   if (old.level > 1) {
     const hpGainPerLevel = 18;
@@ -99,7 +96,6 @@ export function selectClass(state: GameState, playerId: string, classType: Class
     p.baseDefense = cls.baseStats.defense;
   }
 
-  // Re-apply permanent equipment bonuses
   const perms = old.inventory.filter(i => i.permanent);
   perms.forEach(item => {
     p.attack   += item.attackBonus;
@@ -110,7 +106,6 @@ export function selectClass(state: GameState, playerId: string, classType: Class
     p.mp       = Math.min(p.mp + (item.mpBonus ?? 0), p.maxMp);
     p.inventory.push({ ...item });
   });
-  // Keep consumables
   old.inventory.filter(i => !i.permanent && i.consumable).forEach(item => {
     p.inventory.push({ ...item });
   });
@@ -251,7 +246,6 @@ export function continueCombat(state: GameState): GameState {
   return { ...state };
 }
 
-// Clear ULT after client acknowledges
 export function clearUlt(state: GameState): GameState {
   state.activeUlt = null;
   return { ...state };
@@ -340,7 +334,6 @@ export function processPlayerAction(
     const skill = skills[sIdx];
     if (!skill) return state;
 
-    // Check ult level requirement
     if (skill.ultLevel !== undefined && p.level < skill.ultLevel) {
       log(state, `❌ ${p.name}: Nível ${skill.ultLevel} necessário para usar ${skill.name}!`, 'system');
       return state;
@@ -379,7 +372,7 @@ export function processPlayerAction(
         state.currentMonsters = state.currentMonsters.map(m => {
           if (m.hp <= 0) return m;
           let def = applyMonsterCurse(m);
-          if (skill.effect === 'pierce' || skill.effect === 'ult') def = 0; // ULT ignores all def
+          if (skill.effect === 'pierce' || skill.effect === 'ult') def = 0;
           else if (skill.effect === 'ignore_half_def') def = Math.floor(def * 0.5);
           else def = Math.floor(def * 0.5);
           const dmg = calculateDamage(p.attack + skill.damage! + atkBonus, def, dice);
@@ -393,7 +386,6 @@ export function processPlayerAction(
             newM = addMonsterEffect(newM, { type: 'stunned', turnsLeft: skill.stunTurns ?? 1 });
             log(state, `😵 ${m.name} atordoado!`, 'system');
           }
-          // ULT stuns all
           if (skill.effect === 'ult') {
             newM = addMonsterEffect(newM, { type: 'stunned', turnsLeft: 1 });
           }
@@ -447,10 +439,8 @@ export function processPlayerAction(
     // ── HEAL ──
     if (skill.heal !== undefined) {
       if (skill.effect === 'aoe_heal' || skill.effect === 'ult') {
-        // ULT druid heals everyone and revives dead players
         Object.keys(state.players).forEach(pid => {
           const tp = state.players[pid];
-          // ULT druid special: also revive dead allies
           if (skill.effect === 'ult' && !tp.isAlive) {
             const revHp = Math.floor(tp.maxHp * 0.5);
             state.players[pid] = { ...tp, isAlive: true, hp: revHp };
@@ -475,10 +465,16 @@ export function processPlayerAction(
       }
     }
 
+    // ── SALVA p NO STATE ANTES DOS LOOPS DE GRUPO ──
+    // Isso garante que quando os loops iteram state.players[playerId],
+    // eles leem e escrevem a versão atualizada (com mp descontado, etc.)
+    // e o bardo/guerreiro recebe os próprios buffs corretamente.
+    state.players[playerId] = p;
+
     // ── PURE EFFECTS ──
     const eff = skill.effect;
 
-    // Guardian ULT: wall for 3 turns + damage already handled above
+    // Guardian ULT
     if (eff === 'ult' && p.classType === 'guardian') {
       Object.keys(state.players).forEach(pid => {
         const tp = state.players[pid];
@@ -488,7 +484,7 @@ export function processPlayerAction(
       log(state, `🗿 BASTIÃO ETERNO! Grupo invulnerável por 3 turnos!`, 'level_up');
     }
 
-    // Bard ULT: max buffs for everyone
+    // Bard ULT
     if (eff === 'ult' && p.classType === 'bard') {
       Object.keys(state.players).forEach(pid => {
         const tp = state.players[pid];
@@ -564,8 +560,16 @@ export function processPlayerAction(
     if (eff === 'defense_up') {
       const val = skill.defBonus ?? 8;
       const turns = skill.defBonusTurns ?? 2;
-      p.buffs.tempDefBonus = (p.buffs.tempDefBonus ?? 0) + val;
-      p.buffs.tempBonusTurns = Math.max(p.buffs.tempBonusTurns ?? 0, turns);
+      // Lê do state para pegar versão mais recente
+      const cp = state.players[playerId];
+      state.players[playerId] = {
+        ...cp,
+        buffs: {
+          ...cp.buffs,
+          tempDefBonus: (cp.buffs.tempDefBonus ?? 0) + val,
+          tempBonusTurns: Math.max(cp.buffs.tempBonusTurns ?? 0, turns),
+        }
+      };
       log(state, `🛡️ ${p.name} ativa ${skill.emoji} ${skill.name}! +${val} DEF por ${turns} turnos`, 'player_action');
     }
 
@@ -625,7 +629,11 @@ export function processPlayerAction(
     }
 
     if (eff === 'aim') {
-      p.buffs.aimBonus += skill.aimBonus ?? 18;
+      const cp = state.players[playerId];
+      state.players[playerId] = {
+        ...cp,
+        buffs: { ...cp.buffs, aimBonus: cp.buffs.aimBonus + (skill.aimBonus ?? 18) }
+      };
       log(state, `🦅 ${p.name} mira com precisão! Próximo ataque +${skill.aimBonus} dano`, 'player_action');
     }
 
@@ -655,26 +663,41 @@ export function processPlayerAction(
     }
 
     if (eff === 'counter') {
-      p.buffs.counterReflect = skill.counterPct ?? 0.6;
+      const cp = state.players[playerId];
+      state.players[playerId] = {
+        ...cp,
+        buffs: { ...cp.buffs, counterReflect: skill.counterPct ?? 0.6 }
+      };
       log(state, `🔄 ${p.name} prepara Contra-Ataque! Refletirá ${Math.round((skill.counterPct ?? 0.6) * 100)}% do próximo dano`, 'player_action');
     }
 
     if (eff === 'berserk') {
-      p.buffs.tempAtkBonus += skill.berserkAtkBonus ?? 8;
-      p.buffs.tempDefBonus -= (skill.berserkDefPenalty ?? 3);
-      p.buffs.tempBonusTurns = Math.max(p.buffs.tempBonusTurns, skill.berserkTurns ?? 3);
-      p.buffs.berserkTurnsLeft = skill.berserkTurns ?? 3;
+      const cp = state.players[playerId];
+      state.players[playerId] = {
+        ...cp,
+        buffs: {
+          ...cp.buffs,
+          tempAtkBonus: cp.buffs.tempAtkBonus + (skill.berserkAtkBonus ?? 8),
+          tempDefBonus: cp.buffs.tempDefBonus - (skill.berserkDefPenalty ?? 3),
+          tempBonusTurns: Math.max(cp.buffs.tempBonusTurns, skill.berserkTurns ?? 3),
+          berserkTurnsLeft: skill.berserkTurns ?? 3,
+        }
+      };
       log(state, `😡 ${p.name} entra em FRENESI! +${skill.berserkAtkBonus}ATK -${skill.berserkDefPenalty}DEF por ${skill.berserkTurns}t`, 'player_action');
     }
 
     if (eff === 'dodge') {
-      p.buffs.dodgeTurnsLeft = 2;
+      const cp = state.players[playerId];
+      state.players[playerId] = {
+        ...cp,
+        buffs: { ...cp.buffs, dodgeTurnsLeft: 2 }
+      };
       log(state, `💨 ${p.name} usa ${skill.emoji} ${skill.name}! Esquivará dos próximos 2 ataques`, 'player_action');
     }
 
     if (eff === 'taunt') {
       log(state, `${skill.emoji} ${p.name} usa ${skill.name}! Inimigos focam nele por 2 turnos`, 'player_action');
-      (p as any).tauntTurns = 2;
+      (state.players[playerId] as any).tauntTurns = 2;
     }
 
     if (eff === 'revive' && action.targetId) {
@@ -688,7 +711,6 @@ export function processPlayerAction(
       }
     }
 
-    state.players[playerId] = p;
     state.actionsThisTurn[playerId] = true;
     afterAction(state);
     return { ...state };
@@ -978,7 +1000,6 @@ export function proceedToNextMap(state: GameState): GameState {
     state.phase = 'defeat';
     return { ...state };
   }
-  // FIX: preserve stats — only reset buffs/effects, NOT stats
   Object.keys(state.players).forEach(pid => {
     const p = state.players[pid];
     state.players[pid] = {
@@ -986,7 +1007,6 @@ export function proceedToNextMap(state: GameState): GameState {
       hp: p.maxHp,
       mp: p.maxMp,
       isAlive: true,
-      // IMPORTANT: keep attack, defense, maxHp, maxMp as-is (they already include level + equipment)
     };
   });
   state.currentMap = nextId;

@@ -38,14 +38,12 @@ export default function Combat({ gameState, myId, onAction, onReset, onClearUlt 
     selectedSkill &&
     !selectedSkill.selfOnly &&
     !selectedSkill.aoe &&
-    selectedSkill.effect !== 'ult' &&
-    (selectedSkill.effect === 'aoe_heal' ? false :
-      (selectedSkill.damage !== undefined ||
-       selectedSkill.effect === 'poison' ||
-       selectedSkill.effect === 'stun'   ||
-       selectedSkill.effect === 'curse'  ||
-       selectedSkill.effect === 'mark'   ||
-       selectedSkill.effect === 'slow'))
+    (selectedSkill.damage !== undefined ||
+     selectedSkill.effect === 'poison' ||
+     selectedSkill.effect === 'stun'   ||
+     selectedSkill.effect === 'curse'  ||
+     selectedSkill.effect === 'mark'   ||
+     selectedSkill.effect === 'slow')
   );
 
   // Show cutscene when ult arrives
@@ -196,6 +194,12 @@ export default function Combat({ gameState, myId, onAction, onReset, onClearUlt 
                   <div style={{ fontSize: 12, color: 'var(--accent-green-bright)', padding: '5px 10px',
                     background: 'rgba(39,174,96,0.1)', borderRadius: 6, border: '1px solid rgba(39,174,96,0.3)' }}>
                     💚 Selecione um aliado na barra abaixo
+                  </div>
+                )}
+                {needsEnemyTarget && !selectedTarget && selectedSkillIdx !== null && (
+                  <div style={{ fontSize: 12, color: 'var(--accent-red-bright)', padding: '5px 10px',
+                    background: 'rgba(231,76,60,0.1)', borderRadius: 6, border: '1px solid rgba(231,76,60,0.3)' }}>
+                    🎯 Selecione um inimigo acima
                   </div>
                 )}
                 {selectedTarget && (
