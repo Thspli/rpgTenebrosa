@@ -1,4 +1,4 @@
-import { ClassDefinition, ClassType, Item, MapDefinition, MapId, Monster, Skill } from './types';
+import { ClassDefinition, ClassType, Item, MapDefinition, MapId, Monster, Skill, Player, DEFAULT_BUFFS } from './types';
 
 export const CLASSES: Record<ClassType, ClassDefinition> = {
   warrior: {
@@ -257,9 +257,6 @@ function makeMonster(
 ): Monster {
   return { id, name, emoji, level, hp, maxHp: hp, attack, defense, xpReward: xp, coinReward: coins, isBoss, effects: [], ...extras };
 }
-
-import { Monster as MonsterType } from './types';
-type Monster = MonsterType;
 
 export const MAPS: MapDefinition[] = [
   // ── MAP 1 ──────────────────────────────────────────────────────────────────
@@ -710,7 +707,6 @@ export const SHOP_ITEMS: Item[] = [
 
 export const XP_PER_LEVEL = (level: number) => level * 100;
 
-import { Player, DEFAULT_BUFFS } from './types';
 
 export function createPlayer(id: string, name: string, classType: ClassType): Player {
   const cls = CLASSES[classType];
