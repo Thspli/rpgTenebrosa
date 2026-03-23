@@ -652,3 +652,75 @@
 }
 
 .monsterHoverable { cursor: pointer; }
+
+/* ─── ADD TO END OF src/components/Combat.module.css ─── */
+
+/* ULT button */
+.ultBtn {
+  border-color: rgba(212,160,23,0.5) !important;
+  background: rgba(212,160,23,0.06) !important;
+  position: relative;
+  overflow: hidden;
+}
+
+.ultBtn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(212,160,23,0.08), transparent);
+  transform: translateX(-100%);
+  transition: transform 0.6s ease;
+}
+
+.ultBtn:hover:not(:disabled)::after {
+  transform: translateX(100%);
+}
+
+.ultReady {
+  border-color: var(--accent-gold) !important;
+  background: rgba(212,160,23,0.1) !important;
+  box-shadow: 0 0 15px rgba(212,160,23,0.25), inset 0 0 15px rgba(212,160,23,0.05) !important;
+  animation: ultGlow 2s ease-in-out infinite;
+}
+
+.ultLocked {
+  border-color: var(--border-dim) !important;
+  opacity: 0.45 !important;
+  cursor: not-allowed !important;
+  background: var(--bg-dark) !important;
+}
+
+@keyframes ultGlow {
+  0%, 100% { box-shadow: 0 0 10px rgba(212,160,23,0.2), inset 0 0 10px rgba(212,160,23,0.03); }
+  50%       { box-shadow: 0 0 25px rgba(212,160,23,0.4), inset 0 0 20px rgba(212,160,23,0.08); }
+}
+
+/* Use ULT button */
+.useUltBtn {
+  padding: 12px;
+  background: linear-gradient(135deg, #6b4c00, #d4a017, #f0c040);
+  border: none;
+  border-radius: 8px;
+  color: #050508;
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 900;
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 0.1em;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  box-shadow: 0 0 20px rgba(212,160,23,0.4), 0 4px 15px rgba(0,0,0,0.4);
+  animation: ultGlow 1.5s ease-in-out infinite;
+}
+
+.useUltBtn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #d4a017, #f0c040, #fff8cc);
+  box-shadow: 0 0 40px rgba(212,160,23,0.7), 0 4px 20px rgba(0,0,0,0.5);
+  transform: translateY(-1px);
+}
+
+.useUltBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  animation: none;
+}

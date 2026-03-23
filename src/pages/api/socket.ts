@@ -16,6 +16,7 @@ import {
   toggleShopReady,
   saveRoom,
   resetRoom,
+  clearUlt,
 } from '@/lib/gameEngine';
 
 interface SocketServer extends NetServer {
@@ -101,7 +102,6 @@ export default function handler(req: NextApiRequest, res: NextApiResponseWithSoc
       io.to(ROOM_ID).emit('game_state', state);
     });
 
-    // Resume combat after a mid-battle shop break
     socket.on('continue_combat', () => {
       let state = getOrCreateRoom(ROOM_ID);
       state = continueCombat(state);
@@ -116,7 +116,6 @@ export default function handler(req: NextApiRequest, res: NextApiResponseWithSoc
       io.to(ROOM_ID).emit('game_state', state);
     });
 
-    // Toggle ready status in shop — auto-advances when all ready
     socket.on('shop_ready', () => {
       let state = getOrCreateRoom(ROOM_ID);
       state = toggleShopReady(state, socket.id);
@@ -124,10 +123,17 @@ export default function handler(req: NextApiRequest, res: NextApiResponseWithSoc
       io.to(ROOM_ID).emit('game_state', state);
     });
 
-    // After victory shop, go to next map
     socket.on('proceed_to_next_map', () => {
       let state = getOrCreateRoom(ROOM_ID);
       state = proceedToNextMap(state);
+      saveRoom(state);
+      io.to(ROOM_ID).emit('game_state', state);
+    });
+
+    // After cutscene finishes on all clients, clear the ult from state
+    socket.on('clear_ult', () => {
+      let state = getOrCreateRoom(ROOM_ID);
+      state = clearUlt(state);
       saveRoom(state);
       io.to(ROOM_ID).emit('game_state', state);
     });
@@ -149,7 +155,6 @@ export default function handler(req: NextApiRequest, res: NextApiResponseWithSoc
         if (Object.keys(state.players).length === 0) {
           state.phase = 'lobby';
         }
-        // If it was this player's turn, advance
         if (state.activePlayerId === socket.id) {
           const nextAlive = state.playerOrder.find(pid => state.players[pid]?.isAlive && !state.actionsThisTurn[pid]);
           state.activePlayerId = nextAlive ?? null;

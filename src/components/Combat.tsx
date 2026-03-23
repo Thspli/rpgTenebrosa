@@ -1,23 +1,26 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { GameState, Monster, MonsterEffect } from '@/lib/types';
 import { CLASSES, SKILLS, MAPS } from '@/lib/gameData';
 import styles from './Combat.module.css';
+import UltCutscene from './UltCutscene';
 
 interface Props {
   gameState: GameState;
   myId: string;
   onAction: (action: { type: string; targetId?: string; skillIndex?: number; itemId?: string }) => void;
   onReset: () => void;
+  onClearUlt: () => void;
 }
 
 type TargetMode = 'enemy' | 'ally';
 
-export default function Combat({ gameState, myId, onAction, onReset }: Props) {
+export default function Combat({ gameState, myId, onAction, onReset, onClearUlt }: Props) {
   const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
   const [selectedSkillIdx, setSelectedSkillIdx] = useState<number | null>(null);
-  const [targetMode, setTargetMode]   = useState<TargetMode>('enemy');
+  const [targetMode, setTargetMode] = useState<TargetMode>('enemy');
+  const [showingUlt, setShowingUlt] = useState(false);
 
   const myPlayer  = gameState.players[myId];
   const mapDef    = MAPS.find(m => m.id === gameState.currentMap);
@@ -35,6 +38,7 @@ export default function Combat({ gameState, myId, onAction, onReset }: Props) {
     selectedSkill &&
     !selectedSkill.selfOnly &&
     !selectedSkill.aoe &&
+    selectedSkill.effect !== 'ult' &&
     (selectedSkill.effect === 'aoe_heal' ? false :
       (selectedSkill.damage !== undefined ||
        selectedSkill.effect === 'poison' ||
@@ -43,6 +47,18 @@ export default function Combat({ gameState, myId, onAction, onReset }: Props) {
        selectedSkill.effect === 'mark'   ||
        selectedSkill.effect === 'slow'))
   );
+
+  // Show cutscene when ult arrives
+  useEffect(() => {
+    if (gameState.activeUlt && !showingUlt) {
+      setShowingUlt(true);
+    }
+  }, [gameState.activeUlt]);
+
+  const handleUltComplete = useCallback(() => {
+    setShowingUlt(false);
+    onClearUlt();
+  }, [onClearUlt]);
 
   function pickSkill(i: number) {
     if (selectedSkillIdx === i) { setSelectedSkillIdx(null); setSelectedTarget(null); return; }
@@ -67,6 +83,11 @@ export default function Combat({ gameState, myId, onAction, onReset }: Props) {
     setSelectedSkillIdx(null);
     setSelectedTarget(null);
     setTargetMode('enemy');
+  }
+
+  // ── ULT Cutscene overlay ──
+  if (showingUlt && gameState.activeUlt) {
+    return <UltCutscene ult={gameState.activeUlt} onComplete={handleUltComplete} />;
   }
 
   // ── Defeat screen ──────────────────────────────────────────────────────────
@@ -165,15 +186,12 @@ export default function Combat({ gameState, myId, onAction, onReset }: Props) {
                 <div className={styles.xpFill} style={{ width: `${(myPlayer.xp / myPlayer.xpToNextLevel) * 100}%` }} />
               </div>
               <div className={styles.xpText}>{myPlayer.xp}/{myPlayer.xpToNextLevel} XP</div>
-
-              {/* Active buffs */}
               <BuffBar player={myPlayer} />
             </div>
 
             {canAct && (
               <div className={styles.actions}>
 
-                {/* Target hint */}
                 {needsAllyTarget && !selectedTarget && (
                   <div style={{ fontSize: 12, color: 'var(--accent-green-bright)', padding: '5px 10px',
                     background: 'rgba(39,174,96,0.1)', borderRadius: 6, border: '1px solid rgba(39,174,96,0.3)' }}>
@@ -188,7 +206,6 @@ export default function Combat({ gameState, myId, onAction, onReset }: Props) {
                   </div>
                 )}
 
-                {/* Attack */}
                 <button
                   className={styles.attackBtn}
                   onClick={doAttack}
@@ -198,7 +215,6 @@ export default function Combat({ gameState, myId, onAction, onReset }: Props) {
                     ? aliveM.find(m => m.id === selectedTarget)!.name : '(selecione inimigo)'}
                 </button>
 
-                {/* Potions */}
                 {myPotions.length > 0 && (
                   <div className={styles.potionRow}>
                     {myPotions.map(pot => (
@@ -212,12 +228,65 @@ export default function Combat({ gameState, myId, onAction, onReset }: Props) {
                   </div>
                 )}
 
-                {/* Skills */}
+                {/* Skills — regular + ult */}
                 <div className={styles.skillGrid}>
                   {SKILLS[myPlayer.classType].map((skill, i) => {
                     const cost = Math.ceil(skill.mpCost * (mapDef?.manaCostMultiplier ?? 1));
                     const canUse = myPlayer.mp >= cost;
                     const isAlly = !!skill.targetAlly;
+                    const isUlt = skill.effect === 'ult';
+                    const ultLocked = isUlt && myPlayer.level < (skill.ultLevel ?? 3);
+                    const ultUnlocked = isUlt && !ultLocked;
+
+                    if (isUlt) {
+                      return (
+                        <button
+                          key={i}
+                          className={[
+                            styles.skillBtn,
+                            styles.ultBtn,
+                            ultLocked ? styles.ultLocked : '',
+                            selectedSkillIdx === i ? styles.skillSelected : '',
+                            ultUnlocked && canUse ? styles.ultReady : '',
+                          ].join(' ')}
+                          onClick={() => !ultLocked && pickSkill(i)}
+                          disabled={ultLocked || !canUse}
+                          title={
+                            ultLocked
+                              ? `🔒 Desbloqueia no Nível ${skill.ultLevel}`
+                              : skill.description
+                          }
+                        >
+                          <span className={styles.skillEmoji}>{skill.emoji}</span>
+                          <div style={{ flex: 1, textAlign: 'left' }}>
+                            <div style={{
+                              fontFamily: 'var(--font-display)',
+                              fontSize: 12,
+                              color: ultLocked ? 'var(--text-dim)' : (ultUnlocked ? skill.ultColor ?? 'var(--accent-gold-bright)' : 'inherit'),
+                              letterSpacing: '0.08em',
+                              marginBottom: 1,
+                            }}>
+                              {ultLocked ? `🔒 ${skill.name}` : `⚡ ${skill.name}`}
+                            </div>
+                            {ultLocked && (
+                              <div style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-ui)' }}>
+                                Nível {skill.ultLevel} necessário
+                              </div>
+                            )}
+                          </div>
+                          {!ultLocked && cost > 0 && (
+                            <span className={styles.skillMp} style={{
+                              background: 'rgba(212,160,23,0.15)',
+                              color: 'var(--accent-gold-bright)',
+                              border: '1px solid rgba(212,160,23,0.4)',
+                            }}>
+                              {cost}MP
+                            </span>
+                          )}
+                        </button>
+                      );
+                    }
+
                     return (
                       <button
                         key={i}
@@ -247,11 +316,12 @@ export default function Combat({ gameState, myId, onAction, onReset }: Props) {
 
                 {selectedSkillIdx !== null && (
                   <button
-                    className={styles.useSkillBtn}
+                    className={selectedSkill?.effect === 'ult' ? styles.useUltBtn : styles.useSkillBtn}
                     onClick={doSkill}
                     disabled={(needsAllyTarget || needsEnemyTarget) && !selectedTarget}
                   >
-                    ✨ Usar: {selectedSkill?.name}
+                    {selectedSkill?.effect === 'ult' ? '🌟 ATIVAR ULTIMATE: ' : '✨ Usar: '}
+                    {selectedSkill?.name}
                     {(needsAllyTarget || needsEnemyTarget) && !selectedTarget ? ' (selecione alvo)' : ''}
                   </button>
                 )}
@@ -267,7 +337,7 @@ export default function Combat({ gameState, myId, onAction, onReset }: Props) {
         )}
       </div>
 
-      {/* Players row — also ally targeting area */}
+      {/* Players row */}
       <div className={styles.playersRow}>
         {gameState.playerOrder.map(pid => {
           const p = gameState.players[pid];
@@ -291,9 +361,15 @@ export default function Combat({ gameState, myId, onAction, onReset }: Props) {
                 <span>{CLASSES[p.classType].emoji}</span>
                 <span className={styles.miniName}>{p.name}</span>
                 {pid === myId && <span className={styles.youTag}>você</span>}
+                <span style={{
+                  fontFamily: 'var(--font-ui)', fontSize: 9,
+                  color: 'var(--accent-gold)', background: 'rgba(212,160,23,0.1)',
+                  padding: '1px 4px', borderRadius: 3,
+                }}>
+                  Nv.{p.level}
+                </span>
                 {isActive && p.isAlive && <span className={styles.activeDot} />}
                 {!p.isAlive && <span>💀</span>}
-                {/* Buff icons */}
                 {p.buffs.wallTurnsLeft > 0         && <span title="Muralha">🏰</span>}
                 {p.buffs.dodgeTurnsLeft > 0         && <span title="Esquiva">💨</span>}
                 {p.buffs.regenTurnsLeft > 0         && <span title="Regenerando">♻️</span>}
@@ -323,7 +399,6 @@ export default function Combat({ gameState, myId, onAction, onReset }: Props) {
   );
 }
 
-// ── MonsterCard ────────────────────────────────────────────────────────────────
 function MonsterCard({ monster, isSelected, canSelect, onClick }: {
   monster: Monster; isSelected: boolean; canSelect: boolean; onClick: () => void;
 }) {
@@ -359,7 +434,6 @@ function MonsterCard({ monster, isSelected, canSelect, onClick }: {
       </div>
       <div className={styles.monsterHpText}>{monster.hp}/{monster.maxHp}</div>
       <div className={styles.monsterStats}>⚔{monster.attack} 🛡{monster.defense}</div>
-      {/* Status icons */}
       {(poisoned || stunned || cursed || marked || slowed) && (
         <div style={{ display: 'flex', gap: 3, justifyContent: 'center', marginTop: 4, flexWrap: 'wrap' }}>
           {poisoned && <span title={`Envenenado (${eff.find(e=>e.type==='poisoned')?.turnsLeft}t)`}>☠️</span>}
@@ -373,7 +447,6 @@ function MonsterCard({ monster, isSelected, canSelect, onClick }: {
   );
 }
 
-// ── BuffBar ────────────────────────────────────────────────────────────────────
 function BuffBar({ player }: { player: GameState['players'][string] }) {
   const b = player.buffs;
   const chips: { label: string; color: string; bg: string }[] = [];
@@ -404,7 +477,6 @@ function BuffBar({ player }: { player: GameState['players'][string] }) {
   );
 }
 
-// ── Misc ───────────────────────────────────────────────────────────────────────
 function StatBar({ value, max, color, label }: { value: number; max: number; color: string; label: string }) {
   return (
     <div className={styles.statBarRow}>

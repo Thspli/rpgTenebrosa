@@ -39,29 +39,21 @@ export interface Item {
   consumeHeal?: number;
   consumeMpHeal?: number;
   quantity?: number;
-  permanent?: boolean; // equipment that persists across maps/class changes
+  permanent?: boolean;
 }
 
 export interface PlayerBuffs {
-  // Temporary ATK/DEF bonus (lasts N turns)
   tempAtkBonus: number;
   tempDefBonus: number;
   tempBonusTurns: number;
-  // Regen
   regenHpPerTurn: number;
   regenTurnsLeft: number;
-  // Dodge (skip next incoming hits)
   dodgeTurnsLeft: number;
-  // Aim (bonus on next basic attack)
   aimBonus: number;
-  // Counter-reflect
-  counterReflect: number; // fraction 0–1
-  // Guardian wall (reduce all group damage)
+  counterReflect: number;
   wallTurnsLeft: number;
-  // Necromancer group buff
   necroBonusDmg: number;
   necroBonusTurnsLeft: number;
-  // Berserk
   berserkTurnsLeft: number;
 }
 
@@ -96,7 +88,6 @@ export interface Player {
   isReady: boolean;
   isAlive: boolean;
   buffs: PlayerBuffs;
-  // Legacy (kept for compat)
   statusEffects: StatusEffect[];
 }
 
@@ -108,10 +99,10 @@ export interface StatusEffect {
 
 export interface MonsterEffect {
   type: 'poisoned' | 'stunned' | 'cursed' | 'marked' | 'slowed';
-  damage?: number;         // poison dps
-  atkReduction?: number;   // curse
-  defReduction?: number;   // curse
-  damageMultiplier?: number; // mark (e.g. 1.5 = +50%)
+  damage?: number;
+  atkReduction?: number;
+  defReduction?: number;
+  damageMultiplier?: number;
   turnsLeft: number;
 }
 
@@ -184,6 +175,17 @@ export interface GameState {
   waveNumber: number;
   shopCountdown: number;
   shopReady: Record<string, boolean>;
+  // ULT cutscene broadcast
+  activeUlt?: {
+    playerId: string;
+    playerName: string;
+    classType: ClassType;
+    ultName: string;
+    ultLines: string[];
+    ultColor: string;
+    ultBg: string;
+    ultEmoji: string;
+  } | null;
 }
 
 export type PlayerAction =
@@ -196,15 +198,12 @@ export interface Skill {
   description: string;
   mpCost: number;
   emoji: string;
-  // What the skill does
   damage?: number;
   heal?: number;
   aoe?: boolean;
-  targetAlly?: boolean; // needs ally click to use
-  selfOnly?: boolean;   // applies to caster only
-  // Effect tags
+  targetAlly?: boolean;
+  selfOnly?: boolean;
   effect?: SkillEffect;
-  // Effect params
   poisonDmg?: number;
   poisonTurns?: number;
   stunTurns?: number;
@@ -217,7 +216,7 @@ export interface Skill {
   curseDef?: number;
   curseAtk?: number;
   curseTurns?: number;
-  markMult?: number;   // e.g. 1.6
+  markMult?: number;
   markTurns?: number;
   aimBonus?: number;
   regenHp?: number;
@@ -231,7 +230,13 @@ export interface Skill {
   baladaDef?: number;
   baladaHeal?: number;
   reviveHpPct?: number;
-  pierceDef?: boolean; // ignores defense
+  pierceDef?: boolean;
+  // ULT fields
+  ultLevel?: number;       // minimum player level to unlock this skill
+  ultName?: string;        // display name for cutscene
+  ultLines?: string[];     // cinematic lines for cutscene
+  ultColor?: string;       // accent color for cutscene
+  ultBg?: string;          // background gradient for cutscene
 }
 
 export type SkillEffect =
@@ -239,4 +244,4 @@ export type SkillEffect =
   | 'curse' | 'mark' | 'aim' | 'regen' | 'wall' | 'counter'
   | 'berserk' | 'dodge' | 'balada' | 'revive' | 'aoe_heal'
   | 'pierce' | 'ignore_half_def' | 'execute' | 'rage_scale'
-  | 'slow' | 'taunt';
+  | 'slow' | 'taunt' | 'ult';

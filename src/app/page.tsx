@@ -63,6 +63,7 @@ export default function GamePage() {
         myId={myId}
         onAction={(action) => emit('player_action', action)}
         onReset={() => emit('reset_game')}
+        onClearUlt={() => emit('clear_ult')}
       />
     );
   }
@@ -72,4 +73,4 @@ export default function GamePage() {
       <p className={styles.loadingText}>Phase: {phase}</p>
     </div>
   );
-} 
+}

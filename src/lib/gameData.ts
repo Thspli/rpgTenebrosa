@@ -95,6 +95,11 @@ export const SKILLS: Record<ClassType, Skill[]> = {
     { name: 'Fúria de Batalha', emoji: '💢', mpCost: 30, damage: 20, effect: 'ignore_half_def', description: 'Ignora 50% da DEF do alvo, +20 dano' },
     { name: 'Investida',        emoji: '🌪️', mpCost: 20, damage: 8,  aoe: true,  description: 'Ataca TODOS os inimigos (+8 cada)' },
     { name: 'Grito de Guerra',  emoji: '📣', mpCost: 25, effect: 'group_atk_up', atkGroupBonus: 5, atkGroupTurns: 3, description: '+5 ATK para TODOS do grupo por 3 turnos' },
+    { name: 'COLOSSO DA GUERRA', emoji: '🌋', mpCost: 100, damage: 60, aoe: true, effect: 'ult', ultLevel: 3,
+      ultName: 'COLOSSO DA GUERRA',
+      ultLines: ['O guerreiro transcende seus limites...', 'A terra treme sob seus pés...', 'COLOSSO DA GUERRA!'],
+      ultColor: '#e74c3c', ultBg: 'radial-gradient(ellipse, #3d0000 0%, #0a0000 70%)',
+      description: '🔥 ULT: Explosão devastadora em TODOS os inimigos. Dano massivo + ignora toda DEF. (Nv.3)' },
   ],
   mage: [
     { name: 'Bola de Fogo',      emoji: '🔥', mpCost: 15, damage: 10, description: '+10 dano de fogo' },
@@ -103,6 +108,11 @@ export const SKILLS: Record<ClassType, Skill[]> = {
     { name: 'Explosão Arcana',   emoji: '💥', mpCost: 50, damage: 25, aoe: true,  description: 'Dano MASSIVO em todos os inimigos' },
     { name: 'Raio Veloz',        emoji: '⚡', mpCost: 18, damage: 14, description: '+14 dano elétrico' },
     { name: 'Chuva de Meteoros', emoji: '☄️', mpCost: 55, damage: 18, aoe: true,  description: 'Meteoros em todos os inimigos' },
+    { name: 'APOCALIPSE ARCANO', emoji: '🌌', mpCost: 100, damage: 80, aoe: true, effect: 'ult', ultLevel: 3,
+      ultName: 'APOCALIPSE ARCANO',
+      ultLines: ['O mago canaliza energia do além...', 'O tecido da realidade se rompe...', 'APOCALIPSE ARCANO!'],
+      ultColor: '#9b59b6', ultBg: 'radial-gradient(ellipse, #1a0030 0%, #000008 70%)',
+      description: '🔮 ULT: Destrói toda a realidade. Dano devastador em todos os inimigos. (Nv.3)' },
   ],
   rogue: [
     { name: 'Punhalada',       emoji: '🗡️', mpCost: 0,  damage: 5,  description: '+5 dano' },
@@ -111,6 +121,12 @@ export const SKILLS: Record<ClassType, Skill[]> = {
     { name: 'Golpe Crítico',   emoji: '⚡', mpCost: 40, damage: 25, effect: 'pierce',       description: '3x dano, ignora TODA a defesa' },
     { name: 'Sombra Dupla',    emoji: '👥', mpCost: 25, damage: 12, description: 'Ataca 2x no mesmo alvo (+12 cada)' },
     { name: 'Lâmina Venenosa', emoji: '🐍', mpCost: 35, damage: 10, effect: 'poison', poisonDmg: 12, poisonTurns: 5, description: '+10 dano + veneno (12/t por 5 turnos)' },
+    { name: 'DANÇA DA MORTE', emoji: '💀', mpCost: 100, damage: 70, effect: 'ult', ultLevel: 3,
+      ultName: 'DANÇA DA MORTE',
+      ultLines: ['O ladino desaparece nas sombras...', 'Mil lâminas cortam o ar...', 'DANÇA DA MORTE!'],
+      ultColor: '#1abc9c', ultBg: 'radial-gradient(ellipse, #001a15 0%, #000a08 70%)',
+      effect: 'ult',
+      description: '🗡️ ULT: Golpe único devastador que ignora toda DEF + veneno letal. (Nv.3)' },
   ],
   necromancer: [
     { name: 'Raio Sombrio',       emoji: '🖤', mpCost: 10, damage: 10, description: '+10 dano sombrio' },
@@ -119,6 +135,11 @@ export const SKILLS: Record<ClassType, Skill[]> = {
     { name: 'Invocar Morto-Vivo', emoji: '💀', mpCost: 45, effect: 'necro_buff', necroAtkBonus: 8, necroBonusTurns: 5, description: '+8 dano para TODO o grupo por 5 turnos' },
     { name: 'Explosão Sombria',   emoji: '🌑', mpCost: 35, damage: 14, aoe: true,  description: 'Dano sombrio em TODOS os inimigos' },
     { name: 'Toque da Morte',     emoji: '☠️', mpCost: 55, damage: 25, heal: 18,   selfOnly: true, description: '+25 dano + drena 18HP de volta' },
+    { name: 'LEVANTE DOS MORTOS', emoji: '☠️', mpCost: 100, damage: 50, aoe: true, effect: 'ult', ultLevel: 3,
+      ultName: 'LEVANTE DOS MORTOS',
+      ultLines: ['Os mortos respondem ao chamado...', 'Exércitos das trevas emergem...', 'LEVANTE DOS MORTOS!'],
+      ultColor: '#8e44ad', ultBg: 'radial-gradient(ellipse, #1a0028 0%, #050005 70%)',
+      description: '💀 ULT: Levanta um exército espectral. Dano em área + cura o necromante. (Nv.3)' },
   ],
   paladin: [
     { name: 'Smite',           emoji: '✨', mpCost: 10, damage: 8,  description: '+8 dano sagrado' },
@@ -127,6 +148,12 @@ export const SKILLS: Record<ClassType, Skill[]> = {
     { name: 'Bênção Divina',   emoji: '🙏', mpCost: 60, heal: 40,   effect: 'aoe_heal', description: 'Cura 40HP em TODOS os aliados vivos' },
     { name: 'Martelo Sagrado', emoji: '🔨', mpCost: 30, damage: 18, description: '+18 dano sagrado' },
     { name: 'Ressurreição',    emoji: '✝️', mpCost: 70, effect: 'revive', reviveHpPct: 0.4, targetAlly: true, description: 'Revive aliado morto com 40% do HP máximo' },
+    { name: 'JULGAMENTO DIVINO', emoji: '⚡', mpCost: 100, damage: 55, aoe: true, effect: 'ult', ultLevel: 3,
+      heal: 30,
+      ultName: 'JULGAMENTO DIVINO',
+      ultLines: ['A luz dos deuses desce sobre o campo...', 'Nenhuma sombra pode resistir...', 'JULGAMENTO DIVINO!'],
+      ultColor: '#f39c12', ultBg: 'radial-gradient(ellipse, #2a1a00 0%, #0a0600 70%)',
+      description: '⚡ ULT: Luz divina destrói todos os inimigos + cura todo o grupo. (Nv.3)' },
   ],
   ranger: [
     { name: 'Flechada',         emoji: '🏹', mpCost: 0,  damage: 6,  description: '+6 dano' },
@@ -135,6 +162,11 @@ export const SKILLS: Record<ClassType, Skill[]> = {
     { name: 'Chuva de Flechas', emoji: '🌧️', mpCost: 45, damage: 12, aoe: true,  description: 'Ataca TODOS os inimigos (+12 cada)' },
     { name: 'Flecha Explosiva', emoji: '💣', mpCost: 30, damage: 16, description: '+16 dano explosivo' },
     { name: 'Tiro Perfurante',  emoji: '🎯', mpCost: 35, damage: 12, effect: 'pierce', description: 'Ignora TODA a defesa do alvo' },
+    { name: 'TEMPESTADE DE FLECHAS', emoji: '🌪️', mpCost: 100, damage: 45, aoe: true, effect: 'ult', ultLevel: 3,
+      ultName: 'TEMPESTADE DE FLECHAS',
+      ultLines: ['O arqueiro mira em tudo ao mesmo tempo...', 'O céu escurece com flechas...', 'TEMPESTADE DE FLECHAS!'],
+      ultColor: '#3498db', ultBg: 'radial-gradient(ellipse, #001428 0%, #000508 70%)',
+      description: '🏹 ULT: Mil flechas caem do céu. Todos os inimigos atordoados. (Nv.3)' },
   ],
   assassin: [
     { name: 'Ataque Furtivo',    emoji: '🌙', mpCost: 0,  damage: 7,  description: '+7 dano furtivo' },
@@ -143,6 +175,11 @@ export const SKILLS: Record<ClassType, Skill[]> = {
     { name: 'Execução',          emoji: '💀', mpCost: 40, damage: 30, effect: 'execute',   description: '3x dano se alvo < 50% HP (ignora DEF)' },
     { name: 'Golpe Duplo',       emoji: '⚡', mpCost: 25, damage: 15, description: 'Dois golpes rápidos (+15 cada)' },
     { name: 'Veneno Mortal',     emoji: '☠️', mpCost: 35, damage: 12, effect: 'poison', poisonDmg: 15, poisonTurns: 5, description: '+12 dano + veneno mortal (15/t por 5t)' },
+    { name: 'SOMBRA ABSOLUTA', emoji: '🌑', mpCost: 100, damage: 90, effect: 'ult', ultLevel: 3,
+      ultName: 'SOMBRA ABSOLUTA',
+      ultLines: ['O assassino some da existência...', 'Torna-se pura escuridão...', 'SOMBRA ABSOLUTA!'],
+      ultColor: '#2c3e50', ultBg: 'radial-gradient(ellipse, #0a0a0f 0%, #000002 70%)',
+      description: '🌑 ULT: Golpe de um ser além das sombras. Dano MÁXIMO em um alvo. (Nv.3)' },
   ],
   elementalist: [
     { name: 'Chama Menor',          emoji: '🔥', mpCost: 10, damage: 8,  description: '+8 dano de fogo' },
@@ -151,6 +188,11 @@ export const SKILLS: Record<ClassType, Skill[]> = {
     { name: 'Tempestade Elemental', emoji: '🌊', mpCost: 55, damage: 20, aoe: true, description: 'Fogo+gelo+raio em TODOS os inimigos' },
     { name: 'Nova de Gelo',         emoji: '🌨️', mpCost: 30, damage: 10, aoe: true, effect: 'slow', description: 'Gelo+lentidão em TODOS os inimigos' },
     { name: 'Meteoro de Magma',     emoji: '🌋', mpCost: 45, damage: 30, description: '+30 dano de fogo massivo em 1 alvo' },
+    { name: 'CONVERGÊNCIA ELEMENTAL', emoji: '🌀', mpCost: 100, damage: 65, aoe: true, effect: 'ult', ultLevel: 3,
+      ultName: 'CONVERGÊNCIA ELEMENTAL',
+      ultLines: ['Os 4 elementos se unem em um ponto...', 'Fogo, gelo, raio e vento convergem...', 'CONVERGÊNCIA ELEMENTAL!'],
+      ultColor: '#e67e22', ultBg: 'radial-gradient(ellipse, #1a0f00 0%, #060300 70%)',
+      description: '🌀 ULT: Todos os elementos explodem simultaneamente. (Nv.3)' },
   ],
   berserker: [
     { name: 'Golpe Selvagem', emoji: '🪓', mpCost: 0,  damage: 8,  description: '+8 dano brutal' },
@@ -159,6 +201,11 @@ export const SKILLS: Record<ClassType, Skill[]> = {
     { name: 'Devastar',       emoji: '💥', mpCost: 35, damage: 22, effect: 'ignore_half_def', description: 'Ignora 50% da DEF, +22 dano' },
     { name: 'Golpe Triplo',   emoji: '⚡', mpCost: 25, damage: 10, description: 'Ataca 3x no alvo (+10 cada)' },
     { name: 'Ira Sanguinária',emoji: '🩸', mpCost: 45, damage: 20, effect: 'rage_scale', description: 'Dano escala com HP faltando (até 3x se quase morto)' },
+    { name: 'FÚRIA DO TITÃ', emoji: '⚡', mpCost: 100, damage: 75, aoe: true, effect: 'ult', ultLevel: 3,
+      ultName: 'FÚRIA DO TITÃ',
+      ultLines: ['O berserker abandona toda razão...', 'Pura violência primordial desencadeada...', 'FÚRIA DO TITÃ!'],
+      ultColor: '#c0392b', ultBg: 'radial-gradient(ellipse, #280000 0%, #080000 70%)',
+      description: '⚡ ULT: Violência absoluta. Dano em área escala com HP perdido. (Nv.3)' },
   ],
   guardian: [
     { name: 'Escudaraço',       emoji: '🗿', mpCost: 0,  damage: 6,  description: '+6 dano com escudo' },
@@ -167,6 +214,12 @@ export const SKILLS: Record<ClassType, Skill[]> = {
     { name: 'Contra-Ataque',    emoji: '🔄', mpCost: 25, effect: 'counter', counterPct: 0.6, description: 'Reflete 60% do próximo dano recebido' },
     { name: 'Fortaleza',        emoji: '⛩️', mpCost: 20, effect: 'defense_up', defBonus: 20, defBonusTurns: 3, selfOnly: true, description: '+20 DEF por 3 turnos (própria)' },
     { name: 'Golpe de Escudo',  emoji: '🛡️', mpCost: 35, damage: 22, effect: 'stun', stunTurns: 1, description: '+22 dano e atordoa o alvo por 1 turno' },
+    { name: 'BASTIÃO ETERNO', emoji: '🗿', mpCost: 100, effect: 'ult', ultLevel: 3,
+      ultName: 'BASTIÃO ETERNO',
+      ultLines: ['O guardião se torna uma montanha...', 'Nenhuma força pode mover essa rocha...', 'BASTIÃO ETERNO!'],
+      ultColor: '#7f8c8d', ultBg: 'radial-gradient(ellipse, #0f1010 0%, #030404 70%)',
+      damage: 30, aoe: true,
+      description: '🗿 ULT: Torna-se imortal. Grupo invulnerável por 3 turnos + dano em área. (Nv.3)' },
   ],
   druid: [
     { name: 'Espinhos',              emoji: '🌿', mpCost: 0,  damage: 6,  description: '+6 dano da natureza' },
@@ -175,6 +228,11 @@ export const SKILLS: Record<ClassType, Skill[]> = {
     { name: 'Círculo da Vida',       emoji: '🌸', mpCost: 55, heal: 50,   effect: 'aoe_heal', description: 'Cura 50HP em TODOS os aliados vivos' },
     { name: 'Raiz Presa',            emoji: '🌱', mpCost: 25, effect: 'stun', stunTurns: 2, description: 'Enraíza e atordoa o alvo por 2 turnos' },
     { name: 'Tempestade da Floresta',emoji: '🍂', mpCost: 40, damage: 14, aoe: true, effect: 'poison', poisonDmg: 8, poisonTurns: 3, description: '+14 dano em área + veneno (8/t 3t) em todos' },
+    { name: 'RENASCIMENTO DA TERRA', emoji: '🌍', mpCost: 100, heal: 80, effect: 'ult', ultLevel: 3,
+      ultName: 'RENASCIMENTO DA TERRA',
+      ultLines: ['A terra pulsa com energia ancestral...', 'A natureza responde ao chamado...', 'RENASCIMENTO DA TERRA!'],
+      ultColor: '#27ae60', ultBg: 'radial-gradient(ellipse, #001a08 0%, #000503 70%)',
+      description: '🌍 ULT: A natureza cura e ressuscita todos os aliados. (Nv.3)' },
   ],
   bard: [
     { name: 'Nota Cortante',      emoji: '🎵', mpCost: 0,  damage: 6,  description: '+6 dano sonoro' },
@@ -183,6 +241,12 @@ export const SKILLS: Record<ClassType, Skill[]> = {
     { name: 'Balada Épica',       emoji: '🎺', mpCost: 60, effect: 'balada', baladaAtk: 7, baladaDef: 7, baladaHeal: 30, description: '+7 ATK, +7 DEF e +30HP para TODOS do grupo' },
     { name: 'Dissonância',        emoji: '📯', mpCost: 25, damage: 10, aoe: true,  effect: 'stun', stunTurns: 1, description: 'Som ensurdecedor em todos (+10 dano, 40% chance atordoar)' },
     { name: 'Canção da Morte',    emoji: '🎻', mpCost: 45, damage: 22, description: '+22 dano letal' },
+    { name: 'SINFONIA DO APOCALIPSE', emoji: '🎼', mpCost: 100, effect: 'ult', ultLevel: 3,
+      ultName: 'SINFONIA DO APOCALIPSE',
+      ultLines: ['Uma melodia que rasga o mundo...', 'Toda criação treme com o som...', 'SINFONIA DO APOCALIPSE!'],
+      ultColor: '#d35400', ultBg: 'radial-gradient(ellipse, #1a0800 0%, #060200 70%)',
+      damage: 40, aoe: true,
+      description: '🎼 ULT: A música que destrói mundos. Dano + TODOS os buffs máximos. (Nv.3)' },
   ],
 };
 
@@ -283,31 +347,25 @@ export const MAPS: MapDefinition[] = [
   },
 ];
 
-// permanent=true means the item persists across maps and class changes
 export const SHOP_ITEMS: Item[] = [
-  // Consumables
   { id: 'potion_hp_s',  name: 'Poção de Vida P',  emoji: '🧪', price: 20,  attackBonus: 0, defenseBonus: 0, consumable: true, consumeHeal: 50,   quantity: 2, description: 'Usa no combate: +50 HP (vem com 2 usos)' },
   { id: 'potion_hp_m',  name: 'Poção de Vida M',  emoji: '💊', price: 40,  attackBonus: 0, defenseBonus: 0, consumable: true, consumeHeal: 90,   quantity: 2, description: 'Usa no combate: +90 HP (vem com 2 usos)' },
   { id: 'potion_hp_l',  name: 'Elixir de Vida',   emoji: '⚗️', price: 80,  attackBonus: 0, defenseBonus: 0, consumable: true, consumeHeal: 160,  quantity: 2, description: 'Usa no combate: +160 HP (vem com 2 usos)' },
   { id: 'potion_mp_s',  name: 'Poção de Mana P',  emoji: '💧', price: 20,  attackBonus: 0, defenseBonus: 0, consumable: true, consumeMpHeal: 40,  quantity: 2, description: 'Usa no combate: +40 MP (vem com 2 usos)' },
   { id: 'potion_mp_m',  name: 'Poção de Mana M',  emoji: '🫧', price: 40,  attackBonus: 0, defenseBonus: 0, consumable: true, consumeMpHeal: 80,  quantity: 2, description: 'Usa no combate: +80 MP (vem com 2 usos)' },
   { id: 'potion_full',  name: 'Elixir Total',      emoji: '🌟', price: 100, attackBonus: 0, defenseBonus: 0, consumable: true, consumeHeal: 120, consumeMpHeal: 120, quantity: 1, description: 'Usa no combate: +120 HP e +120 MP (1 uso)' },
-  // Tier 1 — Permanent equipment
   { id: 'iron_sword',     name: 'Espada de Ferro',     emoji: '⚔️', price: 30,  attackBonus: 6,  defenseBonus: 0,  description: '+6 ATK permanente',         permanent: true },
   { id: 'steel_shield',   name: 'Escudo de Aço',       emoji: '🛡️', price: 30,  attackBonus: 0,  defenseBonus: 6,  description: '+6 DEF permanente',         permanent: true },
   { id: 'health_stone',   name: 'Pedra da Vitalidade', emoji: '❤️', price: 40,  attackBonus: 0,  defenseBonus: 0,  hpBonus: 40,  description: '+40 HP Máx permanente',    permanent: true },
   { id: 'mana_crystal',   name: 'Cristal de Mana',     emoji: '💎', price: 40,  attackBonus: 0,  defenseBonus: 0,  mpBonus: 40,  description: '+40 MP Máx permanente',    permanent: true },
-  // Tier 2
   { id: 'magic_ring',     name: 'Anel Mágico',         emoji: '💍', price: 55,  attackBonus: 4,  defenseBonus: 4,  description: '+4 ATK +4 DEF permanente',  permanent: true },
   { id: 'amulet',         name: 'Amuleto da Sorte',    emoji: '📿', price: 65,  attackBonus: 5,  defenseBonus: 5,  description: '+5 ATK +5 DEF permanente',  permanent: true },
   { id: 'war_boots',      name: 'Botas de Guerra',     emoji: '👢', price: 55,  attackBonus: 5,  defenseBonus: 3,  description: '+5 ATK +3 DEF permanente',  permanent: true },
   { id: 'mystic_orb',     name: 'Orbe Místico',        emoji: '🔮', price: 65,  attackBonus: 7,  defenseBonus: 0,  mpBonus: 25,  description: '+7 ATK +25 MP permanente', permanent: true },
-  // Tier 3
   { id: 'dragon_scale',    name: 'Escama de Dragão',   emoji: '🐉', price: 85,  attackBonus: 0,  defenseBonus: 12, description: '+12 DEF permanente',        permanent: true },
   { id: 'enchanted_blade', name: 'Lâmina Encantada',   emoji: '✨', price: 85,  attackBonus: 12, defenseBonus: 0,  description: '+12 ATK permanente',        permanent: true },
   { id: 'arcane_tome',     name: 'Tomo Arcano',        emoji: '📖', price: 110, attackBonus: 10, defenseBonus: 0,  mpBonus: 50,  description: '+10 ATK +50 MP permanente', permanent: true },
   { id: 'elixir_life',     name: 'Pedra da Vida',      emoji: '💠', price: 110, attackBonus: 0,  defenseBonus: 6,  hpBonus: 70,  description: '+70 HP +6 DEF permanente', permanent: true },
-  // Tier 4
   { id: 'titan_armor',  name: 'Armadura de Titã',  emoji: '🦺', price: 130, attackBonus: 3,  defenseBonus: 18, description: '+3 ATK +18 DEF permanente',     permanent: true },
   { id: 'void_blade',   name: 'Lâmina do Vazio',   emoji: '🌑', price: 130, attackBonus: 18, defenseBonus: 0,  description: '+18 ATK permanente',            permanent: true },
   { id: 'godslayer',    name: 'Mata-Deuses',        emoji: '🗡️', price: 200, attackBonus: 24, defenseBonus: 6,  description: '+24 ATK +6 DEF permanente',     permanent: true },
@@ -326,7 +384,9 @@ export function createPlayer(id: string, name: string, classType: ClassType): Pl
     hp: cls.baseStats.hp, maxHp: cls.baseStats.hp,
     mp: cls.baseStats.mp, maxMp: cls.baseStats.mp,
     attack: cls.baseStats.attack, defense: cls.baseStats.defense,
-    baseAttack: cls.baseStats.attack, baseDefense: cls.baseStats.defense,
+    // CRITICAL: store base stats so levelUp can scale correctly
+    baseAttack: cls.baseStats.attack,
+    baseDefense: cls.baseStats.defense,
     inventory: [], coins: 0, isReady: false, isAlive: true,
     statusEffects: [],
     buffs: { ...DEFAULT_BUFFS },
@@ -341,20 +401,27 @@ export function calculateDamage(attackerAttack: number, targetDefense: number, d
   return Math.max(1, diceRoll + attackerAttack + bonus - targetDefense);
 }
 
+// FIX: scale from baseAttack/baseDefense, not current attack/defense
+// Previous code: attack: player.attack + Math.floor(newLevel * 1.8)  ← BUG: compounds
+// Fixed code:    attack: player.baseAttack + Math.floor(newLevel * 1.8) ← correct
 export function levelUp(player: Player): { player: Player; didLevelUp: boolean } {
   if (player.xp < player.xpToNextLevel) return { player, didLevelUp: false };
   const newLevel = player.level + 1;
+  const hpGain = 18;
+  const mpGain = 12;
   return {
     player: {
       ...player,
       level: newLevel,
       xp: player.xp - player.xpToNextLevel,
       xpToNextLevel: XP_PER_LEVEL(newLevel),
-      maxHp: player.maxHp + 18,
-      hp: Math.min(player.hp + 18, player.maxHp + 18),
-      maxMp: player.maxMp + 12,
-      attack: player.baseAttack + Math.floor(newLevel * 1.8),
-      defense: player.baseDefense + Math.floor(newLevel * 1.0),
+      maxHp: player.maxHp + hpGain,
+      hp: Math.min(player.hp + hpGain, player.maxHp + hpGain),
+      maxMp: player.maxMp + mpGain,
+      // Scale from BASE stats only — equipment bonuses are already in attack/defense
+      // and are preserved because we only change the "level scaling" portion
+      attack: player.baseAttack + Math.floor(newLevel * 1.8) + (player.attack - player.baseAttack - Math.floor(player.level * 1.8)),
+      defense: player.baseDefense + Math.floor(newLevel * 1.0) + (player.defense - player.baseDefense - Math.floor(player.level * 1.0)),
     },
     didLevelUp: true,
   };
