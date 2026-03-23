@@ -1,4 +1,4 @@
-import { GameState, Player, Monster, MonsterEffect, CombatLogEntry, MapId, ClassType, DEFAULT_BUFFS } from './types';
+import { GameState, Player, Monster, MonsterEffect, CombatLogEntry, MapId, ClassType, DEFAULT_BUFFS, BossUlt } from './types';
 import { MAPS, SHOP_ITEMS, createPlayer, rollDice, calculateDamage, levelUp, CLASSES, SKILLS } from './gameData';
 import { nanoid } from 'nanoid';
 
@@ -178,7 +178,7 @@ export function buyItem(state: GameState, playerId: string, itemId: string): Gam
 function spawnWave(state: GameState): void {
   const mapDef = MAPS.find(m => m.id === state.currentMap)!;
   const pool = [...mapDef.monsters].sort(() => Math.random() - 0.5).slice(0, 2 + Math.floor(Math.random() * 2));
-  state.currentMonsters = pool.map(m => ({ ...m, id: nanoid(), effects: [] }));
+  state.currentMonsters = pool.map(m => ({ ...m, id: nanoid(), effects: [], enraged: false }));
   state.waveNumber += 1;
   log(state, `🌊 Onda ${state.waveNumber}! ${state.currentMonsters.map(m => m.emoji + m.name).join(', ')}`, 'system');
 }
@@ -465,16 +465,11 @@ export function processPlayerAction(
       }
     }
 
-    // ── SALVA p NO STATE ANTES DOS LOOPS DE GRUPO ──
-    // Isso garante que quando os loops iteram state.players[playerId],
-    // eles leem e escrevem a versão atualizada (com mp descontado, etc.)
-    // e o bardo/guerreiro recebe os próprios buffs corretamente.
     state.players[playerId] = p;
 
     // ── PURE EFFECTS ──
     const eff = skill.effect;
 
-    // Guardian ULT
     if (eff === 'ult' && p.classType === 'guardian') {
       Object.keys(state.players).forEach(pid => {
         const tp = state.players[pid];
@@ -484,7 +479,6 @@ export function processPlayerAction(
       log(state, `🗿 BASTIÃO ETERNO! Grupo invulnerável por 3 turnos!`, 'level_up');
     }
 
-    // Bard ULT
     if (eff === 'ult' && p.classType === 'bard') {
       Object.keys(state.players).forEach(pid => {
         const tp = state.players[pid];
@@ -560,7 +554,6 @@ export function processPlayerAction(
     if (eff === 'defense_up') {
       const val = skill.defBonus ?? 8;
       const turns = skill.defBonusTurns ?? 2;
-      // Lê do state para pegar versão mais recente
       const cp = state.players[playerId];
       state.players[playerId] = {
         ...cp,
@@ -719,6 +712,74 @@ export function processPlayerAction(
   return state;
 }
 
+// ─── boss ultimate execution ──────────────────────────────────────────────────
+
+function executeBossUlt(state: GameState, monster: Monster, ult: BossUlt): Monster {
+  log(state, `🌟 ${monster.emoji}${monster.name} usa a ULTIMATE: ${ult.emoji} ${ult.name}!`, 'level_up');
+
+  // Broadcast boss ult cutscene
+  state.activeUlt = {
+    playerId: monster.id,
+    playerName: monster.name,
+    classType: 'warrior' as any, // doesn't matter for boss ult
+    ultName: ult.name,
+    ultLines: ult.lines,
+    ultColor: ult.color,
+    ultBg: ult.bg,
+    ultEmoji: ult.emoji,
+    isBossUlt: true,
+    bossName: monster.name,
+  };
+
+  // AOE damage to all players
+  if (ult.aoeDamage) {
+    Object.keys(state.players).forEach(pid => {
+      const p = state.players[pid];
+      if (!p.isAlive) return;
+      // ULT ignores wall partially (deals 50% even through wall), ignores dodge
+      let dmg = ult.aoeDamage!;
+      if (p.buffs.wallTurnsLeft > 0) dmg = Math.max(1, Math.floor(dmg * 0.4));
+      state.players[pid] = { ...p, hp: Math.max(0, p.hp - dmg) };
+      log(state, `💥 ${ult.emoji} ${ult.name} atinge ${p.name}! ${dmg} dano!`, 'monster_action');
+      if (state.players[pid].hp <= 0) {
+        state.players[pid] = { ...state.players[pid], isAlive: false };
+        log(state, `💀 ${p.name} foi derrotado!`, 'death');
+      }
+    });
+  }
+
+  // Boss heals itself
+  let updatedMonster = { ...monster };
+  if (ult.healSelf) {
+    updatedMonster.hp = Math.min(updatedMonster.maxHp, updatedMonster.hp + ult.healSelf);
+    log(state, `💚 ${monster.emoji}${monster.name} se cura ${ult.healSelf} HP! (${updatedMonster.hp}/${updatedMonster.maxHp})`, 'system');
+  }
+
+  // Remove all debuffs from boss
+  if (ult.removeAllDebuffs) {
+    updatedMonster.effects = [];
+    log(state, `✨ ${monster.name} remove todos os debuffs!`, 'system');
+  }
+
+  // Boss ATK buff
+  if (ult.buffAtk && ult.buffAtkTurns) {
+    updatedMonster.attack = updatedMonster.attack + ult.buffAtk;
+    log(state, `⬆️ ${monster.name} +${ult.buffAtk} ATK por ${ult.buffAtkTurns} turnos!`, 'system');
+  }
+
+  // Permanent enrage multiplier after ult
+  if (ult.enrageMultiplier) {
+    updatedMonster.attack = Math.floor(updatedMonster.attack * ult.enrageMultiplier);
+    log(state, `🔥 ${monster.name} ENTRA EM FÚRIA ETERNA! ATK × ${ult.enrageMultiplier}!`, 'level_up');
+  }
+
+  // Reset cooldown
+  updatedMonster.ultTurnsLeft = updatedMonster.ultCooldown ?? 4;
+  updatedMonster.ultUsed = true;
+
+  return updatedMonster;
+}
+
 // ─── monster phase ────────────────────────────────────────────────────────────
 
 function processMonsterTurns(state: GameState): void {
@@ -729,64 +790,140 @@ function processMonsterTurns(state: GameState): void {
   const aliveMonsters = state.currentMonsters.filter(m => m.hp > 0);
   const alivePlayers = () => Object.values(state.players).filter(p => p.isAlive);
 
-  aliveMonsters.forEach(monster => {
+  // Check for enrage on bosses
+  state.currentMonsters = state.currentMonsters.map(monster => {
+    if (!monster.isBoss || monster.enraged) return monster;
+    if (monster.enrageThreshold && monster.hp / monster.maxHp <= monster.enrageThreshold) {
+      const newAtk = monster.attack + (monster.enrageAtkBonus ?? 0);
+      log(state, `🔴 ${monster.emoji}${monster.name} ENRAIVECEU! ATK +${monster.enrageAtkBonus} (${monster.attack} → ${newAtk})`, 'level_up');
+      return { ...monster, attack: newAtk, enraged: true };
+    }
+    return monster;
+  });
+
+  // Check if any boss can ult (before attacking)
+  state.currentMonsters = state.currentMonsters.map(monster => {
+    if (!monster.isBoss || monster.hp <= 0 || !monster.bossUlt) return monster;
+    const tl = (monster.ultTurnsLeft ?? 1) - 1;
+    if (tl <= 0 && alivePlayers().length > 0) {
+      return executeBossUlt(state, { ...monster, ultTurnsLeft: tl }, monster.bossUlt);
+    }
+    return { ...monster, ultTurnsLeft: tl };
+  });
+
+  // Monster regeneration
+  state.currentMonsters = state.currentMonsters.map(monster => {
+    if (monster.hp <= 0 || !monster.regenPerTurn) return monster;
+    const heal = monster.regenPerTurn;
+    const newHp = Math.min(monster.maxHp, monster.hp + heal);
+    if (newHp > monster.hp) {
+      log(state, `💚 ${monster.emoji}${monster.name} regenera ${heal}HP! (${newHp}/${monster.maxHp})`, 'system');
+    }
+    return { ...monster, hp: newHp };
+  });
+
+  // Each monster attacks
+  aliveMonsters.forEach(monsterSnapshot => {
     if (alivePlayers().length === 0) return;
+
+    const mIdx = state.currentMonsters.findIndex(m => m.id === monsterSnapshot.id);
+    if (mIdx === -1) return;
+    const monster = state.currentMonsters[mIdx];
+    if (monster.hp <= 0) return;
 
     if (isMonsterStunned(monster)) {
       log(state, `😵 ${monster.emoji}${monster.name} está atordoado e perde o turno!`, 'monster_action');
       return;
     }
 
-    let targets = alivePlayers();
-    const tauntTarget = targets.find(p => (p as any).tauntTurns > 0);
-    const target = tauntTarget ?? targets[Math.floor(Math.random() * targets.length)];
-    const tp = state.players[target.id];
+    const attackCount = monster.isBoss ? (monster.multiAttack ?? 1) : 1;
+    const piercePct = monster.armorPierce ?? 0;
 
-    if (tp.buffs.dodgeTurnsLeft > 0) {
-      log(state, `💨 ${target.name} ESQUIVA do ataque de ${monster.emoji}${monster.name}!`, 'monster_action');
-      return;
-    }
+    for (let attackNum = 0; attackNum < attackCount; attackNum++) {
+      if (alivePlayers().length === 0) break;
 
-    const dice = rollDice();
-    const effectiveDef = getEffectiveDef(tp, mapDef.defenseDebuff);
-    const cursedAtk = monster.effects?.find(e => e.type === 'cursed');
-    const monAtk = Math.max(1, monster.attack - (cursedAtk?.atkReduction ?? 0));
-    const slowed = monster.effects?.some(e => e.type === 'slowed');
-    let damage = Math.max(1, calculateDamage(monAtk, effectiveDef, dice));
-    if (slowed) { damage = Math.max(1, Math.floor(damage * 0.7)); }
+      // Determine if this is a splash attack (boss only)
+      const isSplash = monster.isBoss && Math.random() < (monster.splashChance ?? 0);
 
-    if (tp.buffs.wallTurnsLeft > 0) {
-      damage = Math.max(1, Math.floor(damage * 0.2));
-    }
+      if (isSplash) {
+        // Attack ALL alive players
+        log(state, `💢 ${monster.emoji}${monster.name} ATAQUE EXPLOSIVO em todo o grupo!`, 'monster_action');
+        Object.keys(state.players).forEach(pid => {
+          const p = state.players[pid];
+          if (!p.isAlive) return;
+          if (p.buffs.dodgeTurnsLeft > 0) {
+            log(state, `💨 ${p.name} ESQUIVA do splash!`, 'monster_action');
+            return;
+          }
+          const dice = rollDice();
+          const effectiveDef = Math.floor(getEffectiveDef(p, mapDef.defenseDebuff) * (1 - piercePct));
+          const cursedAtk = monster.effects?.find(e => e.type === 'cursed');
+          const monAtk = Math.max(1, monster.attack - (cursedAtk?.atkReduction ?? 0));
+          let damage = Math.max(1, calculateDamage(monAtk, effectiveDef, dice));
+          if (p.buffs.wallTurnsLeft > 0) damage = Math.max(1, Math.floor(damage * 0.2));
+          state.players[pid] = { ...state.players[pid], hp: Math.max(0, p.hp - damage) };
+          log(state, `  💥 ${p.name}: ${damage} dano`, 'monster_action');
+          if (state.players[pid].hp <= 0) {
+            state.players[pid] = { ...state.players[pid], isAlive: false };
+            log(state, `💀 ${p.name} foi derrotado!`, 'death');
+          }
+        });
+      } else {
+        // Single target attack
+        let targets = alivePlayers();
+        if (targets.length === 0) break;
+        const tauntTarget = targets.find(p => (p as any).tauntTurns > 0);
+        const target = tauntTarget ?? targets[Math.floor(Math.random() * targets.length)];
+        const tp = state.players[target.id];
 
-    if (tp.buffs.counterReflect > 0) {
-      const reflect = Math.max(1, Math.floor(damage * tp.buffs.counterReflect));
-      const mIdx = state.currentMonsters.findIndex(m => m.id === monster.id);
-      if (mIdx !== -1) {
-        state.currentMonsters[mIdx] = { ...state.currentMonsters[mIdx], hp: Math.max(0, state.currentMonsters[mIdx].hp - reflect) };
-        log(state, `🔄 ${target.name} CONTRA-ATACA! ${monster.emoji}${monster.name} recebe ${reflect} dano refletido!`, 'player_action');
-        if (state.currentMonsters[mIdx].hp <= 0) onMonsterDeath(state, monster);
+        if (tp.buffs.dodgeTurnsLeft > 0) {
+          log(state, `💨 ${target.name} ESQUIVA do ataque de ${monster.emoji}${monster.name}!`, 'monster_action');
+          continue;
+        }
+
+        const dice = rollDice();
+        const effectiveDef = Math.floor(getEffectiveDef(tp, mapDef.defenseDebuff) * (1 - piercePct));
+        const cursedAtk = monster.effects?.find(e => e.type === 'cursed');
+        const monAtk = Math.max(1, monster.attack - (cursedAtk?.atkReduction ?? 0));
+        const slowed = monster.effects?.some(e => e.type === 'slowed');
+        let damage = Math.max(1, calculateDamage(monAtk, effectiveDef, dice));
+        if (slowed) { damage = Math.max(1, Math.floor(damage * 0.7)); }
+        if (tp.buffs.wallTurnsLeft > 0) { damage = Math.max(1, Math.floor(damage * 0.2)); }
+
+        // Counter-attack
+        if (tp.buffs.counterReflect > 0) {
+          const reflect = Math.max(1, Math.floor(damage * tp.buffs.counterReflect));
+          const bossIdx = state.currentMonsters.findIndex(m => m.id === monster.id);
+          if (bossIdx !== -1) {
+            state.currentMonsters[bossIdx] = { ...state.currentMonsters[bossIdx], hp: Math.max(0, state.currentMonsters[bossIdx].hp - reflect) };
+            log(state, `🔄 ${target.name} CONTRA-ATACA! ${monster.emoji}${monster.name} recebe ${reflect} dano refletido!`, 'player_action');
+            if (state.currentMonsters[bossIdx].hp <= 0) onMonsterDeath(state, monster);
+          }
+          state.players[target.id] = { ...state.players[target.id], buffs: { ...state.players[target.id].buffs, counterReflect: 0 } };
+        }
+
+        state.players[target.id] = {
+          ...state.players[target.id],
+          hp: Math.max(0, state.players[target.id].hp - damage),
+        };
+
+        const hitLabel = attackCount > 1 ? ` (Golpe ${attackNum + 1}/${attackCount})` : '';
+        const notes: string[] = [];
+        if (slowed) notes.push('(Lento -30%)');
+        if (tp.buffs.wallTurnsLeft > 0) notes.push('(🏰 Muralha -80%)');
+        if (mapDef.defenseDebuff > 0) notes.push(`(DEF-${Math.round(mapDef.defenseDebuff * 100)}%)`);
+        if (piercePct > 0) notes.push(`(Penetra ${Math.round(piercePct * 100)}% DEF)`);
+        log(state, `${monster.emoji}${monster.name} ataca ${target.name}${hitLabel}! [🎲${dice}] Dano: ${damage} ${notes.join(' ')}`, 'monster_action');
+
+        if (state.players[target.id].hp <= 0) {
+          state.players[target.id] = { ...state.players[target.id], isAlive: false };
+          log(state, `💀 ${target.name} foi derrotado!`, 'death');
+        }
       }
-      state.players[target.id] = { ...tp, buffs: { ...tp.buffs, counterReflect: 0 } };
-    }
-
-    state.players[target.id] = {
-      ...state.players[target.id],
-      hp: Math.max(0, state.players[target.id].hp - damage),
-    };
-
-    const notes: string[] = [];
-    if (slowed) notes.push('(Lento -30%)');
-    if (tp.buffs.wallTurnsLeft > 0) notes.push('(🏰 Muralha -80%)');
-    if (mapDef.defenseDebuff > 0) notes.push(`(DEF-${mapDef.defenseDebuff * 100}%)`);
-    log(state, `${monster.emoji}${monster.name} ataca ${target.name}! [🎲${dice}] Dano: ${damage} ${notes.join(' ')}`, 'monster_action');
-
-    if (state.players[target.id].hp <= 0) {
-      state.players[target.id] = { ...state.players[target.id], isAlive: false };
-      log(state, `💀 ${target.name} foi derrotado!`, 'death');
     }
   });
 
+  // Apply poison to monsters
   state.currentMonsters = state.currentMonsters.map(monster => {
     if (monster.hp <= 0) return monster;
     let hp = monster.hp;
@@ -802,6 +939,7 @@ function processMonsterTurns(state: GameState): void {
     return { ...monster, hp, effects: newEffects };
   });
 
+  // Player buffs tick down
   Object.keys(state.players).forEach(pid => {
     let p = state.players[pid];
     if (!p.isAlive) return;
@@ -846,6 +984,7 @@ function processMonsterTurns(state: GameState): void {
     state.players[pid] = { ...p, buffs: b };
   });
 
+  // MP regen for players
   Object.keys(state.players).forEach(pid => {
     const p = state.players[pid];
     if (!p.isAlive) return;
@@ -916,10 +1055,10 @@ function checkBattleEnd(state: GameState): void {
     if (hadBoss && !state.bossDefeated) {
       state.bossDefeated = true;
       const nextMapId = (state.currentMap + 1) as MapId;
-      if (nextMapId <= 7 && !state.unlockedMaps.includes(nextMapId)) {
+      if (nextMapId <= 12 && !state.unlockedMaps.includes(nextMapId)) {
         state.unlockedMaps.push(nextMapId);
         const nm = MAPS.find(m => m.id === nextMapId);
-        log(state, `🗺️ ${nm?.theme} ${nm?.name} desbloqueado!`, 'level_up');
+        if (nm) log(state, `🗺️ ${nm.theme} ${nm.name} desbloqueado!`, 'level_up');
       }
       Object.keys(state.players).forEach(pid => {
         const p = state.players[pid];
@@ -939,11 +1078,19 @@ function checkBattleEnd(state: GameState): void {
 
     } else if (!hadBoss) {
       log(state, `💥 Onda limpa! O BOSS aparece!`, 'system');
-      state.currentMonsters = [{ ...mapDef.boss, id: nanoid(), hp: mapDef.boss.maxHp, effects: [] }];
+      const boss = { ...mapDef.boss, id: nanoid(), hp: mapDef.boss.maxHp, effects: [], enraged: false, ultUsed: false, ultTurnsLeft: mapDef.boss.ultCooldown ?? 4 };
+      state.currentMonsters = [boss];
       state.actionsThisTurn = {};
       const first = state.playerOrder.find(pid => state.players[pid]?.isAlive);
       state.activePlayerId = first ?? null;
       if (first) log(state, `🎯 Vez de ${state.players[first].name} agir!`, 'system');
+      // Warn about boss mechanics
+      if (mapDef.boss.multiAttack && mapDef.boss.multiAttack > 1) {
+        log(state, `⚠️ ${mapDef.boss.name} ataca ${mapDef.boss.multiAttack}× por turno!`, 'level_up');
+      }
+      if (mapDef.boss.bossUlt) {
+        log(state, `⚠️ ${mapDef.boss.name} tem um ULTIMATE! Cuidado!`, 'level_up');
+      }
     }
   }
 }
@@ -995,8 +1142,8 @@ function getMarkMult(m: Monster): number {
 
 export function proceedToNextMap(state: GameState): GameState {
   const nextId = (state.currentMap + 1) as MapId;
-  if (nextId > 7) {
-    log(state, `🌟 PARABÉNS! Todos os mapas conquistados! O reino está salvo!`, 'level_up');
+  if (nextId > 12) {
+    log(state, `🌟 PARABÉNS! Você derrotou o DEUS DO VAZIO! O universo está salvo... por enquanto.`, 'level_up');
     state.phase = 'defeat';
     return { ...state };
   }

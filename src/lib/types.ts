@@ -12,7 +12,7 @@ export type ClassType =
   | 'druid'
   | 'bard';
 
-export type MapId = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+export type MapId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
 
 export interface ClassDefinition {
   name: string;
@@ -106,6 +106,22 @@ export interface MonsterEffect {
   turnsLeft: number;
 }
 
+export interface BossUlt {
+  name: string;
+  emoji: string;
+  description: string;
+  // what it does
+  aoeDamage?: number;       // fixed damage to ALL players (ignores def partially)
+  healSelf?: number;        // boss heals itself
+  buffAtk?: number;         // boss ATK boost for N turns
+  buffAtkTurns?: number;
+  removeAllDebuffs?: boolean;
+  enrageMultiplier?: number; // permanent dmg multiplier after ult
+  color: string;
+  bg: string;
+  lines: string[];
+}
+
 export interface Monster {
   id: string;
   name: string;
@@ -119,6 +135,19 @@ export interface Monster {
   coinReward: number;
   isBoss: boolean;
   effects: MonsterEffect[];
+  // Boss mechanics
+  multiAttack?: number;          // how many times boss attacks per turn
+  enrageThreshold?: number;      // HP% where boss enrages (0.5 = 50%)
+  enraged?: boolean;             // runtime flag
+  enrageAtkBonus?: number;       // bonus ATK when enraged
+  ultCooldown?: number;          // turns between boss ults
+  ultTurnsLeft?: number;         // runtime: turns until next ult
+  bossUlt?: BossUlt;             // boss ultimate ability
+  ultUsed?: boolean;             // runtime: has ult been used this fight?
+  // Splash attack: hits multiple players
+  splashChance?: number;         // 0-1 chance to splash AOE attack
+  armorPierce?: number;          // % of defense ignored (0-1)
+  regenPerTurn?: number;         // boss regenerates HP each turn
 }
 
 export interface MapDefinition {
@@ -126,7 +155,7 @@ export interface MapDefinition {
   name: string;
   theme: string;
   description: string;
-  difficulty: 'Iniciante' | 'Intermediário' | 'Avançado' | 'Épico' | 'Lendário';
+  difficulty: 'Iniciante' | 'Intermediário' | 'Avançado' | 'Épico' | 'Lendário' | 'Infernal' | 'Divino';
   defenseDebuff: number;
   manaCostMultiplier: number;
   monsters: Monster[];
@@ -175,7 +204,6 @@ export interface GameState {
   waveNumber: number;
   shopCountdown: number;
   shopReady: Record<string, boolean>;
-  // ULT cutscene broadcast
   activeUlt?: {
     playerId: string;
     playerName: string;
@@ -185,6 +213,9 @@ export interface GameState {
     ultColor: string;
     ultBg: string;
     ultEmoji: string;
+    // Boss ult variant
+    isBossUlt?: boolean;
+    bossName?: string;
   } | null;
 }
 
@@ -231,12 +262,11 @@ export interface Skill {
   baladaHeal?: number;
   reviveHpPct?: number;
   pierceDef?: boolean;
-  // ULT fields
-  ultLevel?: number;       // minimum player level to unlock this skill
-  ultName?: string;        // display name for cutscene
-  ultLines?: string[];     // cinematic lines for cutscene
-  ultColor?: string;       // accent color for cutscene
-  ultBg?: string;          // background gradient for cutscene
+  ultLevel?: number;
+  ultName?: string;
+  ultLines?: string[];
+  ultColor?: string;
+  ultBg?: string;
 }
 
 export type SkillEffect =
