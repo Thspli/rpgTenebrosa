@@ -125,7 +125,6 @@ export const SKILLS: Record<ClassType, Skill[]> = {
       ultName: 'DANÇA DA MORTE',
       ultLines: ['O ladino desaparece nas sombras...', 'Mil lâminas cortam o ar...', 'DANÇA DA MORTE!'],
       ultColor: '#1abc9c', ultBg: 'radial-gradient(ellipse, #001a15 0%, #000a08 70%)',
-      effect: 'ult',
       description: '🗡️ ULT: Golpe único devastador que ignora toda DEF + veneno letal. (Nv.3)' },
   ],
   necromancer: [
