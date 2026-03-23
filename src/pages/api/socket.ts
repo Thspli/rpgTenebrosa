@@ -17,6 +17,7 @@ import {
   saveRoom,
   resetRoom,
   clearUlt,
+  useTransform,
 } from '@/lib/gameEngine';
 
 interface SocketServer extends NetServer {
@@ -116,6 +117,13 @@ export default function handler(req: NextApiRequest, res: NextApiResponseWithSoc
       io.to(ROOM_ID).emit('game_state', state);
     });
 
+    socket.on('use_transform', () => {
+      let state = getOrCreateRoom(ROOM_ID);
+      state = useTransform(state, socket.id);
+      saveRoom(state);
+      io.to(ROOM_ID).emit('game_state', state);
+    });
+
     socket.on('shop_ready', () => {
       let state = getOrCreateRoom(ROOM_ID);
       state = toggleShopReady(state, socket.id);
@@ -130,7 +138,6 @@ export default function handler(req: NextApiRequest, res: NextApiResponseWithSoc
       io.to(ROOM_ID).emit('game_state', state);
     });
 
-    // After cutscene finishes on all clients, clear the ult from state
     socket.on('clear_ult', () => {
       let state = getOrCreateRoom(ROOM_ID);
       state = clearUlt(state);
@@ -152,20 +159,12 @@ export default function handler(req: NextApiRequest, res: NextApiResponseWithSoc
         delete state.players[socket.id];
         state.playerOrder = state.playerOrder.filter(id => id !== socket.id);
         delete state.actionsThisTurn[socket.id];
-        if (Object.keys(state.players).length === 0) {
-          state.phase = 'lobby';
-        }
+        if (Object.keys(state.players).length === 0) state.phase = 'lobby';
         if (state.activePlayerId === socket.id) {
           const nextAlive = state.playerOrder.find(pid => state.players[pid]?.isAlive && !state.actionsThisTurn[pid]);
           state.activePlayerId = nextAlive ?? null;
         }
-        state.combatLog.push({
-          id: Math.random().toString(),
-          turn: state.turn,
-          message: `${name} saiu da sala.`,
-          type: 'system',
-          timestamp: Date.now(),
-        });
+        state.combatLog.push({ id: Math.random().toString(), turn: state.turn, message: `${name} saiu da sala.`, type: 'system', timestamp: Date.now() });
         saveRoom(state);
         io.to(ROOM_ID).emit('game_state', state);
       }

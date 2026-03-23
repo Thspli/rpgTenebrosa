@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { GameState, Monster, MonsterEffect } from '@/lib/types';
 import { CLASSES, SKILLS, MAPS } from '@/lib/gameData';
+import { TRANSFORMS } from '@/lib/transformData';
 import styles from './Combat.module.css';
 import UltCutscene from './UltCutscene';
 
@@ -12,11 +13,12 @@ interface Props {
   onAction: (action: { type: string; targetId?: string; skillIndex?: number; itemId?: string }) => void;
   onReset: () => void;
   onClearUlt: () => void;
+  onTransform: () => void;
 }
 
 type TargetMode = 'enemy' | 'ally';
 
-export default function Combat({ gameState, myId, onAction, onReset, onClearUlt }: Props) {
+export default function Combat({ gameState, myId, onAction, onReset, onClearUlt, onTransform }: Props) {
   const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
   const [selectedSkillIdx, setSelectedSkillIdx] = useState<number | null>(null);
   const [targetMode, setTargetMode] = useState<TargetMode>('enemy');
@@ -30,13 +32,21 @@ export default function Combat({ gameState, myId, onAction, onReset, onClearUlt 
   const activePl  = gameState.activePlayerId ? gameState.players[gameState.activePlayerId] : null;
   const myPotions = myPlayer?.inventory.filter(i => i.consumable && (i.quantity ?? 0) > 0) ?? [];
 
-  const selectedSkill = selectedSkillIdx !== null && myPlayer
-    ? SKILLS[myPlayer.classType][selectedSkillIdx] : null;
+  const isTransformed = (myPlayer?.buffs.transformTurnsLeft ?? 0) > 0;
+  const transform = myPlayer ? TRANSFORMS[myPlayer.classType] : null;
+  const hasTransformItem = myPlayer?.inventory.some(i => i.isTransformItem) ?? false;
+  const canTransform = hasTransformItem && !myPlayer?.buffs.transformUsedThisCombat && !isTransformed;
 
+  // Current skills: transform overrides or normal
+  const currentSkills = isTransformed && transform
+    ? transform.skillOverrides
+    : (myPlayer ? SKILLS[myPlayer.classType] : []);
+
+  const selectedSkill = selectedSkillIdx !== null ? currentSkills[selectedSkillIdx] : null;
   const needsAllyTarget  = !!(selectedSkill?.targetAlly);
   const needsEnemyTarget = !!(
     selectedSkill &&
-    !selectedSkill.selfOnly &&
+    !('selfOnly' in selectedSkill && selectedSkill.selfOnly) &&
     !selectedSkill.aoe &&
     (selectedSkill.damage !== undefined ||
      selectedSkill.effect === 'poison' ||
@@ -46,7 +56,6 @@ export default function Combat({ gameState, myId, onAction, onReset, onClearUlt 
      selectedSkill.effect === 'slow')
   );
 
-  // Show cutscene when ult arrives
   useEffect(() => {
     if (gameState.activeUlt && !showingUlt) {
       setShowingUlt(true);
@@ -60,7 +69,7 @@ export default function Combat({ gameState, myId, onAction, onReset, onClearUlt 
 
   function pickSkill(i: number) {
     if (selectedSkillIdx === i) { setSelectedSkillIdx(null); setSelectedTarget(null); return; }
-    const sk = SKILLS[myPlayer!.classType][i];
+    const sk = currentSkills[i];
     const ally = !!(sk.targetAlly);
     setSelectedSkillIdx(i);
     setSelectedTarget(null);
@@ -83,12 +92,10 @@ export default function Combat({ gameState, myId, onAction, onReset, onClearUlt 
     setTargetMode('enemy');
   }
 
-  // ── ULT Cutscene overlay ──
   if (showingUlt && gameState.activeUlt) {
     return <UltCutscene ult={gameState.activeUlt} onComplete={handleUltComplete} />;
   }
 
-  // ── Defeat screen ──────────────────────────────────────────────────────────
   if (gameState.phase === 'defeat') {
     return (
       <div className={styles.endScreen}>
@@ -107,7 +114,6 @@ export default function Combat({ gameState, myId, onAction, onReset, onClearUlt 
     );
   }
 
-  // ── Main combat UI ─────────────────────────────────────────────────────────
   return (
     <div className={styles.layout} style={{ '--map-bg': mapDef?.bgColor } as React.CSSProperties}>
 
@@ -121,12 +127,6 @@ export default function Combat({ gameState, myId, onAction, onReset, onClearUlt 
         <div className={styles.headerRight}>
           {activePl && (
             <span className={styles.activeTurnBadge}>🎯 Vez de: {activePl.name} {CLASSES[activePl.classType].emoji}</span>
-          )}
-          {(mapDef?.defenseDebuff ?? 0) > 0 && (
-            <span className={styles.debuffBadge}>🛡️ -{(mapDef!.defenseDebuff * 100).toFixed(0)}% DEF</span>
-          )}
-          {(mapDef?.manaCostMultiplier ?? 1) > 1 && (
-            <span className={styles.debuffBadge}>💎 MANA x{mapDef!.manaCostMultiplier}</span>
           )}
           <span className={styles.shopCountdown}>🛒 Loja em: {gameState.shopCountdown}t</span>
           <span className={styles.coins}>💰 {gameState.groupCoins}</span>
@@ -167,10 +167,14 @@ export default function Combat({ gameState, myId, onAction, onReset, onClearUlt 
           <div className={styles.actionPanel}>
 
             {/* My status card */}
-            <div className={`${styles.myStatus} ${isMyTurn ? styles.myStatusActive : ''}`}>
+            <div className={`${styles.myStatus} ${isMyTurn ? styles.myStatusActive : ''} ${isTransformed ? styles.myStatusTransformed : ''}`}>
               <div className={styles.myNameRow}>
-                <span className={styles.myEmoji}>{CLASSES[myPlayer.classType].emoji}</span>
-                <span className={styles.myName}>{myPlayer.name}</span>
+                <span className={styles.myEmoji}>
+                  {isTransformed && transform ? transform.emoji : CLASSES[myPlayer.classType].emoji}
+                </span>
+                <span className={styles.myName}>
+                  {isTransformed && transform ? `${myPlayer.name} [${transform.name}]` : myPlayer.name}
+                </span>
                 <span className={styles.myLevel}>Nv.{myPlayer.level}</span>
                 {!myPlayer.isAlive && <span className={styles.deadBadge}>💀 Derrotado</span>}
                 {isMyTurn && myPlayer.isAlive  && <span className={styles.yourTurnBadge}>⚡ SUA VEZ!</span>}
@@ -178,6 +182,16 @@ export default function Combat({ gameState, myId, onAction, onReset, onClearUlt 
                   <span className={styles.waitingBadge}>⌛ Vez de {activePl.name}</span>
                 )}
               </div>
+              {isTransformed && (
+                <div style={{
+                  fontSize: 11, color: 'var(--accent-gold-bright)', fontFamily: 'var(--font-ui)',
+                  background: 'rgba(212,160,23,0.12)', border: '1px solid rgba(212,160,23,0.4)',
+                  borderRadius: 5, padding: '3px 8px', marginBottom: 8,
+                  animation: 'pulse 1.5s ease-in-out infinite',
+                }}>
+                  🌟 TRANSFORMADO — {myPlayer.buffs.transformTurnsLeft} turnos restantes
+                </div>
+              )}
               <StatBar value={myPlayer.hp} max={myPlayer.maxHp} color="var(--hp-color)" label="HP" />
               <StatBar value={myPlayer.mp} max={myPlayer.maxMp} color="var(--mp-color)" label="MP" />
               <div className={styles.xpBar}>
@@ -210,12 +224,57 @@ export default function Combat({ gameState, myId, onAction, onReset, onClearUlt 
                   </div>
                 )}
 
+                {/* Transform button */}
+                {hasTransformItem && (
+                  <button
+                    className={[
+                      styles.skillBtn,
+                      styles.transformBtn,
+                      canTransform ? styles.transformReady : '',
+                      isTransformed ? styles.transformActive : '',
+                      myPlayer.buffs.transformUsedThisCombat && !isTransformed ? styles.transformUsed : '',
+                    ].join(' ')}
+                    onClick={() => canTransform && onTransform()}
+                    disabled={!canTransform}
+                    title={
+                      isTransformed ? `🌟 Transformado por ${myPlayer.buffs.transformTurnsLeft} turnos`
+                      : myPlayer.buffs.transformUsedThisCombat ? '❌ Já usado neste combate'
+                      : `🌟 Transformar em ${transform?.name} por 6 turnos`
+                    }
+                  >
+                    <span style={{ fontSize: 18 }}>🌟</span>
+                    <div style={{ flex: 1, textAlign: 'left' }}>
+                      <div style={{ fontFamily: 'var(--font-display)', fontSize: 12, letterSpacing: '0.08em',
+                        color: isTransformed ? 'var(--accent-gold-bright)' : myPlayer.buffs.transformUsedThisCombat ? 'var(--text-dim)' : 'var(--accent-gold-bright)' }}>
+                        {isTransformed
+                          ? `✨ ${transform?.name} (${myPlayer.buffs.transformTurnsLeft}t)`
+                          : myPlayer.buffs.transformUsedThisCombat
+                            ? '🌟 Essência Esgotada'
+                            : `🌟 TRANSFORMAR: ${transform?.name}`}
+                      </div>
+                      <div style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-ui)' }}>
+                        {isTransformed
+                          ? 'Skills substituídas por versões divinas'
+                          : myPlayer.buffs.transformUsedThisCombat
+                            ? 'Uso único por combate'
+                            : `6 turnos · ATK×${transform?.atkMultiplier} DEF×${transform?.defMultiplier} +${transform?.hpBonusFlat}HP`}
+                      </div>
+                    </div>
+                    {!myPlayer.buffs.transformUsedThisCombat && !isTransformed && (
+                      <span style={{ fontFamily: 'var(--font-ui)', fontSize: 10, color: 'var(--accent-gold-bright)',
+                        background: 'rgba(212,160,23,0.2)', padding: '2px 6px', borderRadius: 3, border: '1px solid rgba(212,160,23,0.4)' }}>
+                        1x
+                      </span>
+                    )}
+                  </button>
+                )}
+
                 <button
                   className={styles.attackBtn}
                   onClick={doAttack}
                   disabled={!selectedTarget || !aliveM.find(m => m.id === selectedTarget)}
                 >
-                  ⚔️ Atacar {selectedTarget && aliveM.find(m => m.id === selectedTarget)
+                  {isTransformed ? `${transform?.emoji} ` : '⚔️ '}Atacar {selectedTarget && aliveM.find(m => m.id === selectedTarget)
                     ? aliveM.find(m => m.id === selectedTarget)!.name : '(selecione inimigo)'}
                 </button>
 
@@ -232,100 +291,109 @@ export default function Combat({ gameState, myId, onAction, onReset, onClearUlt 
                   </div>
                 )}
 
-                {/* Skills — regular + ult */}
+                {/* Skills — transformed or normal */}
                 <div className={styles.skillGrid}>
-                  {SKILLS[myPlayer.classType].map((skill, i) => {
-                    const cost = Math.ceil(skill.mpCost * (mapDef?.manaCostMultiplier ?? 1));
-                    const canUse = myPlayer.mp >= cost;
-                    const isAlly = !!skill.targetAlly;
-                    const isUlt = skill.effect === 'ult';
-                    const ultLocked = isUlt && myPlayer.level < (skill.ultLevel ?? 3);
-                    const ultUnlocked = isUlt && !ultLocked;
-
-                    if (isUlt) {
+                  {isTransformed && transform ? (
+                    // Transform skills
+                    transform.skillOverrides.map((skill, i) => {
+                      const canUse = myPlayer.mp >= skill.mpCost;
                       return (
                         <button
                           key={i}
                           className={[
                             styles.skillBtn,
-                            styles.ultBtn,
-                            ultLocked ? styles.ultLocked : '',
+                            styles.transformSkillBtn,
                             selectedSkillIdx === i ? styles.skillSelected : '',
-                            ultUnlocked && canUse ? styles.ultReady : '',
                           ].join(' ')}
-                          onClick={() => !ultLocked && pickSkill(i)}
-                          disabled={ultLocked || !canUse}
-                          title={
-                            ultLocked
-                              ? `🔒 Desbloqueia no Nível ${skill.ultLevel}`
-                              : skill.description
-                          }
+                          onClick={() => pickSkill(i)}
+                          disabled={!canUse}
+                          title={skill.description}
                         >
                           <span className={styles.skillEmoji}>{skill.emoji}</span>
-                          <div style={{ flex: 1, textAlign: 'left' }}>
-                            <div style={{
-                              fontFamily: 'var(--font-display)',
-                              fontSize: 12,
-                              color: ultLocked ? 'var(--text-dim)' : (ultUnlocked ? skill.ultColor ?? 'var(--accent-gold-bright)' : 'inherit'),
-                              letterSpacing: '0.08em',
-                              marginBottom: 1,
-                            }}>
-                              {ultLocked ? `🔒 ${skill.name}` : `⚡ ${skill.name}`}
-                            </div>
-                            {ultLocked && (
-                              <div style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-ui)' }}>
-                                Nível {skill.ultLevel} necessário
-                              </div>
-                            )}
-                          </div>
-                          {!ultLocked && cost > 0 && (
-                            <span className={styles.skillMp} style={{
-                              background: 'rgba(212,160,23,0.15)',
-                              color: 'var(--accent-gold-bright)',
-                              border: '1px solid rgba(212,160,23,0.4)',
-                            }}>
-                              {cost}MP
-                            </span>
+                          <span className={styles.skillName}>{skill.name}</span>
+                          {skill.targetAlly && (
+                            <span style={{ fontSize: 10, color: 'var(--accent-green-bright)',
+                              background: 'rgba(39,174,96,0.15)', padding: '1px 4px', borderRadius: 3 }}>aliado</span>
                           )}
+                          {skill.mpCost > 0 && <span className={styles.skillMp} style={{ color: 'var(--accent-gold-bright)', background: 'rgba(212,160,23,0.15)', border: '1px solid rgba(212,160,23,0.3)' }}>{skill.mpCost}MP</span>}
                         </button>
                       );
-                    }
+                    })
+                  ) : (
+                    // Normal skills
+                    SKILLS[myPlayer.classType].map((skill, i) => {
+                      const cost = skill.mpCost;
+                      const canUse = myPlayer.mp >= cost;
+                      const isAlly = !!skill.targetAlly;
+                      const isUlt = skill.effect === 'ult';
+                      const ultLocked = isUlt && myPlayer.level < (skill.ultLevel ?? 3);
+                      const ultUnlocked = isUlt && !ultLocked;
 
-                    return (
-                      <button
-                        key={i}
-                        className={[
-                          styles.skillBtn,
-                          i >= 3 ? styles.specialBtn : '',
-                          selectedSkillIdx === i ? styles.skillSelected : '',
-                          isAlly ? styles.allySkillBtn : '',
-                        ].join(' ')}
-                        onClick={() => pickSkill(i)}
-                        disabled={!canUse}
-                        title={skill.description + (cost > 0 ? ` — ${cost} MP` : '')}
-                      >
-                        <span className={styles.skillEmoji}>{skill.emoji}</span>
-                        <span className={styles.skillName}>{skill.name}</span>
-                        {isAlly && (
-                          <span style={{ fontSize: 10, color: 'var(--accent-green-bright)',
-                            background: 'rgba(39,174,96,0.15)', padding: '1px 4px', borderRadius: 3 }}>
-                            aliado
-                          </span>
-                        )}
-                        {cost > 0 && <span className={styles.skillMp}>{cost}MP</span>}
-                      </button>
-                    );
-                  })}
+                      if (isUlt) {
+                        return (
+                          <button
+                            key={i}
+                            className={[
+                              styles.skillBtn,
+                              styles.ultBtn,
+                              ultLocked ? styles.ultLocked : '',
+                              selectedSkillIdx === i ? styles.skillSelected : '',
+                              ultUnlocked && canUse ? styles.ultReady : '',
+                            ].join(' ')}
+                            onClick={() => !ultLocked && pickSkill(i)}
+                            disabled={ultLocked || !canUse}
+                            title={ultLocked ? `🔒 Nível ${skill.ultLevel} necessário` : skill.description}
+                          >
+                            <span className={styles.skillEmoji}>{skill.emoji}</span>
+                            <div style={{ flex: 1, textAlign: 'left' }}>
+                              <div style={{ fontFamily: 'var(--font-display)', fontSize: 12, color: ultLocked ? 'var(--text-dim)' : (ultUnlocked ? skill.ultColor ?? 'var(--accent-gold-bright)' : 'inherit'), letterSpacing: '0.08em', marginBottom: 1 }}>
+                                {ultLocked ? `🔒 ${skill.name}` : `⚡ ${skill.name}`}
+                              </div>
+                              {ultLocked && <div style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-ui)' }}>Nível {skill.ultLevel} necessário</div>}
+                            </div>
+                            {!ultLocked && cost > 0 && (
+                              <span className={styles.skillMp} style={{ background: 'rgba(212,160,23,0.15)', color: 'var(--accent-gold-bright)', border: '1px solid rgba(212,160,23,0.4)' }}>
+                                {cost}MP
+                              </span>
+                            )}
+                          </button>
+                        );
+                      }
+
+                      return (
+                        <button
+                          key={i}
+                          className={[
+                            styles.skillBtn,
+                            i >= 3 ? styles.specialBtn : '',
+                            selectedSkillIdx === i ? styles.skillSelected : '',
+                            isAlly ? styles.allySkillBtn : '',
+                          ].join(' ')}
+                          onClick={() => pickSkill(i)}
+                          disabled={!canUse}
+                          title={skill.description}
+                        >
+                          <span className={styles.skillEmoji}>{skill.emoji}</span>
+                          <span className={styles.skillName}>{skill.name}</span>
+                          {isAlly && (
+                            <span style={{ fontSize: 10, color: 'var(--accent-green-bright)', background: 'rgba(39,174,96,0.15)', padding: '1px 4px', borderRadius: 3 }}>aliado</span>
+                          )}
+                          {cost > 0 && <span className={styles.skillMp}>{cost}MP</span>}
+                        </button>
+                      );
+                    })
+                  )}
                 </div>
 
                 {selectedSkillIdx !== null && (
                   <button
-                    className={selectedSkill?.effect === 'ult' ? styles.useUltBtn : styles.useSkillBtn}
+                    className={isTransformed ? styles.useUltBtn : (currentSkills[selectedSkillIdx]?.effect === 'ult' ? styles.useUltBtn : styles.useSkillBtn)}
                     onClick={doSkill}
                     disabled={(needsAllyTarget || needsEnemyTarget) && !selectedTarget}
+                    style={isTransformed ? { background: `linear-gradient(135deg, ${transform?.ultColor}88, ${transform?.ultColor})` } : {}}
                   >
-                    {selectedSkill?.effect === 'ult' ? '🌟 ATIVAR ULTIMATE: ' : '✨ Usar: '}
-                    {selectedSkill?.name}
+                    {isTransformed ? `${transform?.emoji} Usar: ` : (currentSkills[selectedSkillIdx]?.effect === 'ult' ? '🌟 ATIVAR ULTIMATE: ' : '✨ Usar: ')}
+                    {currentSkills[selectedSkillIdx]?.name}
                     {(needsAllyTarget || needsEnemyTarget) && !selectedTarget ? ' (selecione alvo)' : ''}
                   </button>
                 )}
@@ -346,9 +414,11 @@ export default function Combat({ gameState, myId, onAction, onReset, onClearUlt 
         {gameState.playerOrder.map(pid => {
           const p = gameState.players[pid];
           if (!p) return null;
-          const isActive    = gameState.activePlayerId === pid;
+          const isActive = gameState.activePlayerId === pid;
+          const pTransformed = p.buffs.transformTurnsLeft > 0;
+          const pTransform = TRANSFORMS[p.classType];
           const allySelectable = canAct && targetMode === 'ally' && needsAllyTarget;
-          const allySelected   = selectedTarget === pid && targetMode === 'ally';
+          const allySelected = selectedTarget === pid && targetMode === 'ally';
           return (
             <div
               key={pid}
@@ -358,22 +428,20 @@ export default function Combat({ gameState, myId, onAction, onReset, onClearUlt 
                 isActive ? styles.activePlayer : '',
                 allySelected ? styles.allySelectedPlayer : '',
                 allySelectable ? styles.allySelectable : '',
+                pTransformed ? styles.transformedPlayer : '',
               ].join(' ')}
               onClick={() => allySelectable && setSelectedTarget(prev => prev === pid ? null : pid)}
             >
               <div className={styles.miniHeader}>
-                <span>{CLASSES[p.classType].emoji}</span>
+                <span>{pTransformed ? pTransform.emoji : CLASSES[p.classType].emoji}</span>
                 <span className={styles.miniName}>{p.name}</span>
                 {pid === myId && <span className={styles.youTag}>você</span>}
-                <span style={{
-                  fontFamily: 'var(--font-ui)', fontSize: 9,
-                  color: 'var(--accent-gold)', background: 'rgba(212,160,23,0.1)',
-                  padding: '1px 4px', borderRadius: 3,
-                }}>
+                <span style={{ fontFamily: 'var(--font-ui)', fontSize: 9, color: 'var(--accent-gold)', background: 'rgba(212,160,23,0.1)', padding: '1px 4px', borderRadius: 3 }}>
                   Nv.{p.level}
                 </span>
                 {isActive && p.isAlive && <span className={styles.activeDot} />}
                 {!p.isAlive && <span>💀</span>}
+                {pTransformed && <span title={`Transformado ${p.buffs.transformTurnsLeft}t`}>🌟</span>}
                 {p.buffs.wallTurnsLeft > 0         && <span title="Muralha">🏰</span>}
                 {p.buffs.dodgeTurnsLeft > 0         && <span title="Esquiva">💨</span>}
                 {p.buffs.regenTurnsLeft > 0         && <span title="Regenerando">♻️</span>}
@@ -440,11 +508,11 @@ function MonsterCard({ monster, isSelected, canSelect, onClick }: {
       <div className={styles.monsterStats}>⚔{monster.attack} 🛡{monster.defense}</div>
       {(poisoned || stunned || cursed || marked || slowed) && (
         <div style={{ display: 'flex', gap: 3, justifyContent: 'center', marginTop: 4, flexWrap: 'wrap' }}>
-          {poisoned && <span title={`Envenenado (${eff.find(e=>e.type==='poisoned')?.turnsLeft}t)`}>☠️</span>}
-          {stunned  && <span title={`Atordoado (${eff.find(e=>e.type==='stunned')?.turnsLeft}t)`}>😵</span>}
-          {cursed   && <span title={`Amaldiçoado (${eff.find(e=>e.type==='cursed')?.turnsLeft}t)`}>🔮</span>}
-          {marked   && <span title={`Marcado ×${eff.find(e=>e.type==='marked')?.damageMultiplier?.toFixed(1)} (${eff.find(e=>e.type==='marked')?.turnsLeft}t)`}>🎯</span>}
-          {slowed   && <span title={`Lento (${eff.find(e=>e.type==='slowed')?.turnsLeft}t)`}>❄️</span>}
+          {poisoned && <span title="Envenenado">☠️</span>}
+          {stunned  && <span title="Atordoado">😵</span>}
+          {cursed   && <span title="Amaldiçoado">🔮</span>}
+          {marked   && <span title="Marcado">🎯</span>}
+          {slowed   && <span title="Lento">❄️</span>}
         </div>
       )}
     </div>
@@ -471,11 +539,7 @@ function BuffBar({ player }: { player: GameState['players'][string] }) {
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
       {chips.map((c, i) => (
-        <span key={i} style={{
-          fontSize: 11, padding: '2px 6px', borderRadius: 4,
-          color: c.color, background: c.bg, border: `1px solid ${c.color}55`,
-          fontFamily: 'var(--font-ui)',
-        }}>{c.label}</span>
+        <span key={i} style={{ fontSize: 11, padding: '2px 6px', borderRadius: 4, color: c.color, background: c.bg, border: `1px solid ${c.color}55`, fontFamily: 'var(--font-ui)' }}>{c.label}</span>
       ))}
     </div>
   );

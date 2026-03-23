@@ -724,3 +724,45 @@
   cursor: not-allowed;
   animation: none;
 }
+/* ─── TRANSFORM STYLES ─── */
+.myStatusTransformed {
+  border-color: var(--accent-gold) !important;
+  box-shadow: 0 0 0 1px rgba(212,160,23,0.5), 0 0 30px rgba(212,160,23,0.2) !important;
+  background: linear-gradient(135deg, var(--bg-panel) 0%, rgba(212,160,23,0.05) 100%) !important;
+}
+.transformBtn {
+  border-color: rgba(212,160,23,0.4) !important;
+  background: rgba(212,160,23,0.06) !important;
+  position: relative;
+  overflow: hidden;
+}
+.transformReady {
+  border-color: var(--accent-gold) !important;
+  background: rgba(212,160,23,0.1) !important;
+  box-shadow: 0 0 20px rgba(212,160,23,0.3) !important;
+  animation: ultGlow 2s ease-in-out infinite;
+}
+.transformActive {
+  border-color: var(--accent-gold-bright) !important;
+  background: rgba(212,160,23,0.15) !important;
+  box-shadow: 0 0 25px rgba(212,160,23,0.4) !important;
+  animation: ultGlow 1.5s ease-in-out infinite;
+}
+.transformUsed {
+  border-color: var(--border-dim) !important;
+  opacity: 0.4 !important;
+  cursor: not-allowed !important;
+}
+.transformSkillBtn {
+  border-color: rgba(212,160,23,0.5) !important;
+  background: rgba(212,160,23,0.08) !important;
+}
+.transformSkillBtn:hover:not(:disabled) {
+  border-color: var(--accent-gold) !important;
+  background: rgba(212,160,23,0.15) !important;
+  color: var(--accent-gold-bright) !important;
+}
+.transformedPlayer {
+  border-color: var(--accent-gold) !important;
+  box-shadow: 0 0 8px rgba(212,160,23,0.3) !important;
+}

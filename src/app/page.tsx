@@ -64,6 +64,7 @@ export default function GamePage() {
         onAction={(action) => emit('player_action', action)}
         onReset={() => emit('reset_game')}
         onClearUlt={() => emit('clear_ult')}
+        onTransform={() => emit('use_transform')}
       />
     );
   }

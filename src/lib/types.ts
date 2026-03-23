@@ -40,6 +40,7 @@ export interface Item {
   consumeMpHeal?: number;
   quantity?: number;
   permanent?: boolean;
+  isTransformItem?: boolean;
 }
 
 export interface PlayerBuffs {
@@ -55,6 +56,9 @@ export interface PlayerBuffs {
   necroBonusDmg: number;
   necroBonusTurnsLeft: number;
   berserkTurnsLeft: number;
+  // Transformation
+  transformTurnsLeft: number;
+  transformUsedThisCombat: boolean;
 }
 
 export const DEFAULT_BUFFS: PlayerBuffs = {
@@ -66,6 +70,8 @@ export const DEFAULT_BUFFS: PlayerBuffs = {
   wallTurnsLeft: 0,
   necroBonusDmg: 0, necroBonusTurnsLeft: 0,
   berserkTurnsLeft: 0,
+  transformTurnsLeft: 0,
+  transformUsedThisCombat: false,
 };
 
 export interface Player {
@@ -145,6 +151,35 @@ export interface Monster {
   splashChance?: number;
   armorPierce?: number;
   regenPerTurn?: number;
+  dropsTransformItem?: boolean;
+}
+
+export interface TransformDefinition {
+  name: string;
+  emoji: string;
+  description: string;
+  atkMultiplier: number;
+  defMultiplier: number;
+  hpBonusFlat: number;
+  ultLines: string[];
+  ultColor: string;
+  ultBg: string;
+  skillOverrides: TransformSkill[];
+}
+
+export interface TransformSkill {
+  name: string;
+  emoji: string;
+  mpCost: number;
+  description: string;
+  damage?: number;
+  heal?: number;
+  aoe?: boolean;
+  targetAlly?: boolean;
+  effect?: string;
+  poisonDmg?: number;
+  poisonTurns?: number;
+  stunTurns?: number;
 }
 
 export interface MapDefinition {
@@ -212,12 +247,14 @@ export interface GameState {
     ultEmoji: string;
     isBossUlt?: boolean;
     bossName?: string;
+    isTransform?: boolean;
   } | null;
 }
 
 export type PlayerAction =
   | { type: 'attack'; targetId: string }
   | { type: 'use_potion'; itemId: string }
+  | { type: 'use_transform' }
   | { type: 'skill'; skillIndex: number; targetId?: string };
 
 export interface Skill {
