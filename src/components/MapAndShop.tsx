@@ -112,7 +112,6 @@ export default function MapAndShop({ gameState, myId, onSelectMap, onBuyItem, on
             </div>
 
             <div className={styles.readySection}>
-              {/* Per-player ready status */}
               <div className={styles.readyList}>
                 {alivePlayers.map(p => (
                   <div key={p.id} className={styles.readyChip}>
@@ -262,6 +261,8 @@ function getDiffClass(difficulty: string, styles: Record<string, string>): strin
     'Avançado': styles.diff_avancado,
     'Épico': styles.diff_epico,
     'Lendário': styles.diff_lendario,
+    'Infernal': styles.diff_infernal,
+    'Divino': styles.diff_divino,
   };
   return map[difficulty] ?? '';
 }

@@ -110,13 +110,12 @@ export interface BossUlt {
   name: string;
   emoji: string;
   description: string;
-  // what it does
-  aoeDamage?: number;       // fixed damage to ALL players (ignores def partially)
-  healSelf?: number;        // boss heals itself
-  buffAtk?: number;         // boss ATK boost for N turns
+  aoeDamage?: number;
+  healSelf?: number;
+  buffAtk?: number;
   buffAtkTurns?: number;
   removeAllDebuffs?: boolean;
-  enrageMultiplier?: number; // permanent dmg multiplier after ult
+  enrageMultiplier?: number;
   color: string;
   bg: string;
   lines: string[];
@@ -135,19 +134,17 @@ export interface Monster {
   coinReward: number;
   isBoss: boolean;
   effects: MonsterEffect[];
-  // Boss mechanics
-  multiAttack?: number;          // how many times boss attacks per turn
-  enrageThreshold?: number;      // HP% where boss enrages (0.5 = 50%)
-  enraged?: boolean;             // runtime flag
-  enrageAtkBonus?: number;       // bonus ATK when enraged
-  ultCooldown?: number;          // turns between boss ults
-  ultTurnsLeft?: number;         // runtime: turns until next ult
-  bossUlt?: BossUlt;             // boss ultimate ability
-  ultUsed?: boolean;             // runtime: has ult been used this fight?
-  // Splash attack: hits multiple players
-  splashChance?: number;         // 0-1 chance to splash AOE attack
-  armorPierce?: number;          // % of defense ignored (0-1)
-  regenPerTurn?: number;         // boss regenerates HP each turn
+  multiAttack?: number;
+  enrageThreshold?: number;
+  enraged?: boolean;
+  enrageAtkBonus?: number;
+  ultCooldown?: number;
+  ultTurnsLeft?: number;
+  bossUlt?: BossUlt;
+  ultUsed?: boolean;
+  splashChance?: number;
+  armorPierce?: number;
+  regenPerTurn?: number;
 }
 
 export interface MapDefinition {
@@ -213,7 +210,6 @@ export interface GameState {
     ultColor: string;
     ultBg: string;
     ultEmoji: string;
-    // Boss ult variant
     isBossUlt?: boolean;
     bossName?: string;
   } | null;
