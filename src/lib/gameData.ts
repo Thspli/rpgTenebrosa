@@ -134,7 +134,7 @@ export const SKILLS: Record<ClassType, Skill[]> = {
     { name: 'Invocar Morto-Vivo', emoji: '💀', mpCost: 45, effect: 'necro_buff', necroAtkBonus: 8, necroBonusTurns: 5, description: '+8 dano para TODO o grupo por 5 turnos' },
     { name: 'Explosão Sombria',   emoji: '🌑', mpCost: 35, damage: 14, aoe: true,  description: 'Dano sombrio em TODOS os inimigos' },
     { name: 'Toque da Morte',     emoji: '☠️', mpCost: 55, damage: 25, heal: 18,   selfOnly: true, description: '+25 dano + drena 18HP de volta' },
-    { name: 'LEVANTE DOS MORTOS', emoji: '☠️', mpCost: 100, damage: 50, aoe: true, effect: 'ult', ultLevel: 3,
+    { name: 'LEVANTE DOS MORTOS', emoji: '☠️', mpCost: 100, damage: 50, aoe: true, heal: 40, effect: 'ult', ultLevel: 3,
       ultName: 'LEVANTE DOS MORTOS',
       ultLines: ['Os mortos respondem ao chamado...', 'Exércitos das trevas emergem...', 'LEVANTE DOS MORTOS!'],
       ultColor: '#8e44ad', ultBg: 'radial-gradient(ellipse, #1a0028 0%, #050005 70%)',

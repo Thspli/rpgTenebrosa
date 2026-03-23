@@ -176,10 +176,36 @@ export interface TransformSkill {
   heal?: number;
   aoe?: boolean;
   targetAlly?: boolean;
+  selfOnly?: boolean;
   effect?: string;
   poisonDmg?: number;
   poisonTurns?: number;
   stunTurns?: number;
+  defBonus?: number;
+  defBonusTurns?: number;
+  atkGroupBonus?: number;
+  atkGroupTurns?: number;
+  necroAtkBonus?: number;
+  necroBonusTurns?: number;
+  aimBonus?: number;
+  regenHp?: number;
+  regenTurns?: number;
+  wallTurns?: number;
+  counterPct?: number;
+  berserkAtkBonus?: number;
+  berserkDefPenalty?: number;
+  berserkTurns?: number;
+  baladaAtk?: number;
+  baladaDef?: number;
+  baladaHeal?: number;
+  reviveHpPct?: number;
+  curseDef?: number;
+  curseAtk?: number;
+  curseTurns?: number;
+  markMult?: number;
+  markTurns?: number;
+  execute?: boolean;
+  ignoreHalfDef?: boolean;
 }
 
 export interface MapDefinition {

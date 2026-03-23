@@ -806,6 +806,13 @@ function applySkillEffects(
     log(state, `🗿 BASTIÃO ETERNO! Grupo invulnerável por 3 turnos!`, 'level_up');
   }
 
+  if (eff === 'ult' && p.classType === 'necromancer') {
+    const healAmt = Math.min(p.maxHp - p.hp, skill.heal ?? 40);
+    p.hp = p.hp + healAmt;
+    state.players[playerId] = { ...state.players[playerId], hp: p.hp };
+    if (healAmt > 0) log(state, `🩸 ${p.name} drena vida dos mortos! +${healAmt} HP!`, 'player_action');
+  }
+
   if (eff === 'ult' && p.classType === 'bard') {
     Object.keys(state.players).forEach(pid => {
       const tp = state.players[pid];
