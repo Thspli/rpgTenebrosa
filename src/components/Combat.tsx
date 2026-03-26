@@ -476,6 +476,10 @@ export default function Combat({ gameState, myId, onAction, onReset, onClearUlt,
                 {p.buffs.tempBonusTurns > 0         && <span title="Buff ATK/DEF">✨</span>}
                 {p.buffs.necroBonusTurnsLeft > 0    && <span title="Buff Necromante">💀</span>}
                 {p.buffs.counterReflect > 0         && <span title="Contra-Ataque">🔄</span>}
+                {(p.buffs.soulCount ?? 0) > 0       && <span title={`${p.buffs.soulCount} Alma(s)`} style={{ fontSize: 11, color: '#8e44ad', fontFamily: 'var(--font-ui)', background: 'rgba(142,68,173,.2)', padding: '1px 3px', borderRadius: 3 }}>💀{p.buffs.soulCount}</span>}
+                {(p.buffs.summonCount ?? 0) > 0     && <span title={`${p.buffs.summonCount} Aliado(s)`} style={{ fontSize: 11, color: '#a0522d', fontFamily: 'var(--font-ui)', background: 'rgba(160,82,45,.2)', padding: '1px 3px', borderRadius: 3 }}>🐾{p.buffs.summonCount}</span>}
+                {(p.buffs.spiritStacks ?? 0) > 0    && <span title={`${p.buffs.spiritStacks} Carga(s) Espiritual`} style={{ fontSize: 11, color: '#5f9ea0', fontFamily: 'var(--font-ui)', background: 'rgba(95,158,160,.2)', padding: '1px 3px', borderRadius: 3 }}>🌀{p.buffs.spiritStacks}</span>}
+                {(p.buffs.cloneTurnsLeft ?? 0) > 0  && <span title="Clone Ativo">👤</span>}
               </div>
               <SmallBar value={p.hp} max={p.maxHp} color="var(--hp-color)" />
               <SmallBar value={p.mp} max={p.maxMp} color="var(--mp-color)" />

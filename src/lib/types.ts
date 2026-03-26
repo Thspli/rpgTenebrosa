@@ -229,7 +229,8 @@ export interface TransformSkill {
   markTurns?: number;
   execute?: boolean;
   ignoreHalfDef?: boolean;
-  // Ult fields (for transform ult skills)
+  summonAnimalId?: string;
+  cloneTurns?: number;
   ultLevel?: number;
   ultName?: string;
   ultLines?: string[];
@@ -350,6 +351,8 @@ export interface Skill {
   baladaHeal?: number;
   reviveHpPct?: number;
   pierceDef?: boolean;
+  cloneTurns?: number;
+  summonAnimalId?: string;
   ultLevel?: number;
   ultName?: string;
   ultLines?: string[];
