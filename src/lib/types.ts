@@ -370,4 +370,5 @@ export type SkillEffect =
   | 'summon_animal'   // animalist: summon an animal ally
   | 'spirit_stack'    // shaman: build spirit stacks
   | 'clone'           // trickster: spawn a clone
-  | 'soul_harvest';   // necromancer: absorb soul from kill (passive trigger)
+  | 'soul_harvest'   // necromancer: absorb soul from kill (passive trigger)
+  |'position_swap' | 'illusion_atk';

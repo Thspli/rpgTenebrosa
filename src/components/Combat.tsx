@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { GameState, Monster, MonsterEffect } from '@/lib/types';
 import { CLASSES, SKILLS, MAPS } from '@/lib/gameData';
 import { TRANSFORMS } from '@/lib/transformData';
 import styles from './Combat.module.css';
 import UltCutscene from './UltCutscene';
+import ActionFeed from './ActionFeed';
 
 interface Props {
   gameState: GameState;
@@ -23,48 +24,36 @@ export default function Combat({ gameState, myId, onAction, onReset, onClearUlt,
   const [selectedSkillIdx, setSelectedSkillIdx] = useState<number | null>(null);
   const [targetMode, setTargetMode] = useState<TargetMode>('enemy');
   const [showingUlt, setShowingUlt] = useState(false);
+  const logScrollRef = useRef<HTMLDivElement>(null);
 
-  const myPlayer  = gameState.players[myId];
-  const mapDef    = MAPS.find(m => m.id === gameState.currentMap);
-  const isMyTurn  = gameState.activePlayerId === myId;
-  const canAct    = !!(myPlayer?.isAlive && isMyTurn && gameState.phase === 'combat');
-  // FIX: only real enemies (not summons) are valid attack targets
-  const aliveM    = gameState.currentMonsters.filter(m => m.hp > 0 && !m.isSummon);
-  // Real enemies only for the monster grid
+  const myPlayer   = gameState.players[myId];
+  const mapDef     = MAPS.find(m => m.id === gameState.currentMap);
+  const isMyTurn   = gameState.activePlayerId === myId;
+  const canAct     = !!(myPlayer?.isAlive && isMyTurn && gameState.phase === 'combat');
+  const aliveM     = gameState.currentMonsters.filter(m => m.hp > 0 && !m.isSummon);
   const enemyMonsters = gameState.currentMonsters.filter(m => !m.isSummon);
-  // Allied summons shown separately
   const alliedSummons = gameState.currentMonsters.filter(m => m.isSummon && m.hp > 0);
-  const activePl  = gameState.activePlayerId ? gameState.players[gameState.activePlayerId] : null;
-  const myPotions = myPlayer?.inventory.filter(i => i.consumable && (i.quantity ?? 0) > 0) ?? [];
-
+  const activePl   = gameState.activePlayerId ? gameState.players[gameState.activePlayerId] : null;
+  const myPotions  = myPlayer?.inventory.filter(i => i.consumable && (i.quantity ?? 0) > 0) ?? [];
   const isTransformed = (myPlayer?.buffs.transformTurnsLeft ?? 0) > 0;
-  const transform = myPlayer ? TRANSFORMS[myPlayer.classType] : null;
+  const transform  = myPlayer ? TRANSFORMS[myPlayer.classType] : null;
   const hasTransformItem = myPlayer?.inventory.some(i => i.isTransformItem) ?? false;
   const canTransform = hasTransformItem && !myPlayer?.buffs.transformUsedThisCombat && !isTransformed;
-
-  // Current skills: transform overrides or normal
-  const currentSkills = isTransformed && transform
-    ? transform.skillOverrides
-    : (myPlayer ? SKILLS[myPlayer.classType] : []);
-
+  const currentSkills = isTransformed && transform ? transform.skillOverrides : (myPlayer ? SKILLS[myPlayer.classType] : []);
   const selectedSkill = selectedSkillIdx !== null ? currentSkills[selectedSkillIdx] : null;
   const needsAllyTarget  = !!(selectedSkill?.targetAlly);
-  const needsEnemyTarget = !!(
-    selectedSkill &&
-    !('selfOnly' in selectedSkill && selectedSkill.selfOnly) &&
-    !selectedSkill.aoe &&
-    (selectedSkill.damage !== undefined ||
-     selectedSkill.effect === 'poison' ||
-     selectedSkill.effect === 'stun'   ||
-     selectedSkill.effect === 'curse'  ||
-     selectedSkill.effect === 'mark'   ||
-     selectedSkill.effect === 'slow')
-  );
+  const needsEnemyTarget = !!(selectedSkill && !('selfOnly' in selectedSkill && selectedSkill.selfOnly) && !selectedSkill.aoe &&
+    (selectedSkill.damage !== undefined || ['poison','stun','curse','mark','slow'].includes(selectedSkill.effect ?? '')));
+
+  // Auto-scroll log
+  useEffect(() => {
+    if (logScrollRef.current) {
+      logScrollRef.current.scrollTop = logScrollRef.current.scrollHeight;
+    }
+  }, [gameState.combatLog.length]);
 
   useEffect(() => {
-    if (gameState.activeUlt && !showingUlt) {
-      setShowingUlt(true);
-    }
+    if (gameState.activeUlt && !showingUlt) setShowingUlt(true);
   }, [gameState.activeUlt]);
 
   const handleUltComplete = useCallback(() => {
@@ -105,7 +94,7 @@ export default function Combat({ gameState, myId, onAction, onReset, onClearUlt,
     return (
       <div className={styles.endScreen}>
         <div className={styles.endCard}>
-          <div className={styles.endIcon}>💀</div>
+          <span className={styles.endIcon}>💀</span>
           <h2 className={styles.endTitle}>DERROTA</h2>
           <p className={styles.endSubtitle}>O grupo foi aniquilado pelas forças das trevas...</p>
           <div className={styles.endLog}>
@@ -120,39 +109,44 @@ export default function Combat({ gameState, myId, onAction, onReset, onClearUlt,
   }
 
   return (
-    <div className={styles.layout} style={{ '--map-bg': mapDef?.bgColor } as React.CSSProperties}>
+    <div className={styles.layout}>
+      {/* Floating action feed */}
+      <ActionFeed log={gameState.combatLog} />
 
-      {/* Header */}
+      {/* HEADER */}
       <div className={styles.header}>
         <div className={styles.headerLeft}>
-          <span className={styles.mapName}>{mapDef?.theme} {mapDef?.name}</span>
-          <span className={styles.turn}>Turno {gameState.turn}</span>
-          <span className={styles.wave}>Onda {gameState.waveNumber}</span>
+          <span className={styles.mapBadge}>{mapDef?.theme} {mapDef?.name}</span>
+          <span className={styles.metaBadge}>Turno {gameState.turn}</span>
+          <span className={styles.metaBadge}>Onda {gameState.waveNumber}</span>
         </div>
         <div className={styles.headerRight}>
           {activePl && (
-            <span className={styles.activeTurnBadge}>🎯 Vez de: {activePl.name} {CLASSES[activePl.classType].emoji}</span>
+            <span className={styles.activeTurnBadge}>
+              ⚡ {activePl.name} {CLASSES[activePl.classType].emoji}
+            </span>
           )}
-          <span className={styles.shopCountdown}>🛒 Loja em: {gameState.shopCountdown}t</span>
-          <span className={styles.coins}>💰 {gameState.groupCoins}</span>
+          <span className={styles.shopBadge}>🛒 {gameState.shopCountdown}t</span>
+          <span className={styles.coinsBadge}>💰 {gameState.groupCoins}</span>
         </div>
       </div>
 
-      {/* Main area */}
+      {/* MAIN AREA */}
       <div className={styles.mainArea}>
 
-        {/* Monsters */}
-        <div className={styles.monstersSection}>
-          <h3 className={styles.sectionLabel}>
+        {/* BATTLEFIELD */}
+        <div className={styles.battlefield}>
+          {/* Enemies */}
+          <div className={styles.sectionLabel}>
             ⚔ Inimigos
             {canAct && targetMode === 'enemy' && (
-              <span style={{ fontSize: 11, color: 'var(--accent-red-bright)', marginLeft: 8, fontFamily: 'var(--font-ui)' }}>
-                ← clique para selecionar alvo
+              <span style={{ color: 'var(--accent-red-bright)', fontSize: 10, letterSpacing: '0.05em' }}>
+                SELECIONE UM ALVO
               </span>
             )}
-          </h3>
+          </div>
+
           <div className={styles.monsterGrid}>
-            {/* FIX: only show real enemies (no isSummon) in the enemy target grid */}
             {enemyMonsters.map(monster => (
               <MonsterCard
                 key={monster.id}
@@ -167,89 +161,86 @@ export default function Combat({ gameState, myId, onAction, onReset, onClearUlt,
             ))}
           </div>
 
-          {/* Allied summons section */}
+          {/* Allied Summons */}
           {alliedSummons.length > 0 && (
-            <div style={{ marginTop: 16 }}>
-              <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 13, color: 'var(--accent-green-bright)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 10 }}>
-                🤝 Aliados Invocados
-              </h3>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-                {alliedSummons.map(summon => (
-                  <div key={summon.id} style={{
-                    background: summon.isNecroShadow ? 'rgba(142,68,173,0.1)' : 'rgba(39,174,96,0.08)',
-                    border: `1px solid ${summon.isNecroShadow ? 'rgba(142,68,173,0.5)' : 'rgba(39,174,96,0.4)'}`,
-                    borderRadius: 8, padding: '10px 14px', minWidth: 110, textAlign: 'center',
-                  }}>
-                    <div style={{ fontSize: 28, marginBottom: 4 }}>{summon.emoji}</div>
-                    <div style={{ fontFamily: 'var(--font-display)', fontSize: 11, color: summon.isNecroShadow ? '#9b59b6' : 'var(--accent-green-bright)', marginBottom: 4 }}>{summon.name}</div>
-                    <div style={{ height: 5, background: 'var(--bg-dark)', borderRadius: 3, overflow: 'hidden', marginBottom: 4 }}>
-                      <div style={{ height: '100%', background: summon.isNecroShadow ? '#8e44ad' : 'var(--accent-green)', width: `${(summon.hp / summon.maxHp) * 100}%`, borderRadius: 3 }} />
+            <>
+              <div className={styles.sectionLabel}>🤝 Aliados Invocados</div>
+              <div className={styles.summonsSection}>
+                {alliedSummons.map(s => {
+                  const isAnimal = !s.isNecroShadow;
+                  const color = s.isNecroShadow ? '#8e44ad' : '#a0522d';
+                  const bg = s.isNecroShadow ? 'rgba(142,68,173,0.1)' : 'rgba(160,82,45,0.1)';
+                  const border = s.isNecroShadow ? 'rgba(142,68,173,0.5)' : 'rgba(160,82,45,0.4)';
+                  const role = (s as any).animalRole ?? (s.isNecroShadow ? 'sombra' : 'aliado');
+                  const roleEmoji: Record<string, string> = {
+                    damage: '⚔️', tank: '🛡️', healer: '💚', buffer: '✨', debuffer: '☠️', sombra: '👻', aliado: '🤝',
+                  };
+                  return (
+                    <div key={s.id} className={styles.summonCard} style={{ background: bg, borderColor: border, color }}>
+                      <span className={styles.summonEmoji}>{s.emoji}</span>
+                      <span className={styles.summonName}>{s.name}</span>
+                      <span className={styles.summonRole}>{roleEmoji[role]} {role}</span>
+                      <div className={styles.summonHpBar}>
+                        <div className={styles.summonHpFill} style={{ width: `${(s.hp/s.maxHp)*100}%`, background: color }} />
+                      </div>
+                      <span className={styles.summonInfo}>{s.hp}/{s.maxHp} · {s.summonDuration}t · ⚔{s.attack}</span>
                     </div>
-                    <div style={{ fontFamily: 'var(--font-ui)', fontSize: 10, color: 'var(--text-secondary)' }}>{summon.hp}/{summon.maxHp}</div>
-                    <div style={{ fontFamily: 'var(--font-ui)', fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>⚔{summon.attack} ⏳{summon.summonDuration}t</div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
-            </div>
+            </>
           )}
         </div>
 
-        {/* Action panel */}
+        {/* ACTION PANEL */}
         {myPlayer && (
           <div className={styles.actionPanel}>
-
-            {/* My status card */}
-            <div className={`${styles.myStatus} ${isMyTurn ? styles.myStatusActive : ''} ${isTransformed ? styles.myStatusTransformed : ''}`}>
+            {/* My Status */}
+            <div className={[
+              styles.myStatus,
+              isMyTurn ? styles.myStatusActive : '',
+              isTransformed ? styles.myStatusTransformed : '',
+            ].join(' ')}>
               <div className={styles.myNameRow}>
                 <span className={styles.myEmoji}>
                   {isTransformed && transform ? transform.emoji : CLASSES[myPlayer.classType].emoji}
                 </span>
-                <span className={styles.myName}>
-                  {isTransformed && transform ? `${myPlayer.name} [${transform.name}]` : myPlayer.name}
-                </span>
+                <span className={styles.myName}>{myPlayer.name}</span>
                 <span className={styles.myLevel}>Nv.{myPlayer.level}</span>
-                {!myPlayer.isAlive && <span className={styles.deadBadge}>💀 Derrotado</span>}
-                {isMyTurn && myPlayer.isAlive  && <span className={styles.yourTurnBadge}>⚡ SUA VEZ!</span>}
+                {!myPlayer.isAlive && <span className={styles.deadBadge}>💀</span>}
+                {isMyTurn && myPlayer.isAlive && <span className={styles.yourTurnBadge}>⚡ SUA VEZ</span>}
                 {!isMyTurn && myPlayer.isAlive && activePl && (
-                  <span className={styles.waitingBadge}>⌛ Vez de {activePl.name}</span>
+                  <span className={styles.waitingBadge}>⌛ {activePl.name}</span>
+                )}
+                {isTransformed && (
+                  <span className={styles.transformedBadge}>🌟 {myPlayer.buffs.transformTurnsLeft}t</span>
                 )}
               </div>
-              {isTransformed && (
-                <div style={{
-                  fontSize: 11, color: 'var(--accent-gold-bright)', fontFamily: 'var(--font-ui)',
-                  background: 'rgba(212,160,23,0.12)', border: '1px solid rgba(212,160,23,0.4)',
-                  borderRadius: 5, padding: '3px 8px', marginBottom: 8,
-                  animation: 'pulse 1.5s ease-in-out infinite',
-                }}>
-                  🌟 TRANSFORMADO — {myPlayer.buffs.transformTurnsLeft} turnos restantes
-                </div>
-              )}
+
               <StatBar value={myPlayer.hp} max={myPlayer.maxHp} color="var(--hp-color)" label="HP" />
               <StatBar value={myPlayer.mp} max={myPlayer.maxMp} color="var(--mp-color)" label="MP" />
-              <div className={styles.xpBar}>
-                <div className={styles.xpFill} style={{ width: `${(myPlayer.xp / myPlayer.xpToNextLevel) * 100}%` }} />
+              <div className={styles.xpRow}>
+                <div className={styles.xpFill} style={{ width: `${(myPlayer.xp/myPlayer.xpToNextLevel)*100}%` }} />
               </div>
               <div className={styles.xpText}>{myPlayer.xp}/{myPlayer.xpToNextLevel} XP</div>
-              <BuffBar player={myPlayer} />
+              <BuffChips player={myPlayer} />
             </div>
 
-            {canAct && (
+            {canAct ? (
               <div className={styles.actions}>
-
+                {/* Target hints */}
                 {needsAllyTarget && !selectedTarget && (
-                  <div style={{ fontSize: 12, color: 'var(--accent-green-bright)', padding: '5px 10px',
-                    background: 'rgba(39,174,96,0.1)', borderRadius: 6, border: '1px solid rgba(39,174,96,0.3)' }}>
-                    💚 Selecione um aliado na barra abaixo
+                  <div className={`${styles.targetHint} ${styles.targetHintAlly}`}>
+                    💚 Selecione um aliado abaixo
                   </div>
                 )}
                 {needsEnemyTarget && !selectedTarget && selectedSkillIdx !== null && (
-                  <div style={{ fontSize: 12, color: 'var(--accent-red-bright)', padding: '5px 10px',
-                    background: 'rgba(231,76,60,0.1)', borderRadius: 6, border: '1px solid rgba(231,76,60,0.3)' }}>
-                    🎯 Selecione um inimigo acima
+                  <div className={`${styles.targetHint} ${styles.targetHintEnemy}`}>
+                    🎯 Selecione um inimigo à esquerda
                   </div>
                 )}
                 {selectedTarget && (
-                  <div className={`${styles.targetInfo} ${targetMode === 'ally' ? styles.targetInfoAlly : ''}`}>
+                  <div className={`${styles.targetHint} ${targetMode === 'ally' ? styles.targetHintAlly : styles.targetHintEnemy}`}>
                     {targetMode === 'enemy'
                       ? `🎯 Alvo: ${aliveM.find(m => m.id === selectedTarget)?.name ?? '?'}`
                       : `💚 Aliado: ${gameState.players[selectedTarget]?.name ?? '?'}`}
@@ -268,48 +259,39 @@ export default function Combat({ gameState, myId, onAction, onReset, onClearUlt,
                     ].join(' ')}
                     onClick={() => canTransform && onTransform()}
                     disabled={!canTransform}
-                    title={
-                      isTransformed ? `🌟 Transformado por ${myPlayer.buffs.transformTurnsLeft} turnos`
-                      : myPlayer.buffs.transformUsedThisCombat ? '❌ Já usado neste combate'
-                      : `🌟 Transformar em ${transform?.name} por 6 turnos`
-                    }
                   >
-                    <span style={{ fontSize: 18 }}>🌟</span>
+                    <span style={{ fontSize: 16 }}>🌟</span>
                     <div style={{ flex: 1, textAlign: 'left' }}>
-                      <div style={{ fontFamily: 'var(--font-display)', fontSize: 12, letterSpacing: '0.08em',
-                        color: isTransformed ? 'var(--accent-gold-bright)' : myPlayer.buffs.transformUsedThisCombat ? 'var(--text-dim)' : 'var(--accent-gold-bright)' }}>
+                      <div style={{
+                        fontFamily: 'var(--font-display)', fontSize: 11, letterSpacing: '0.08em',
+                        color: isTransformed ? 'var(--accent-gold-bright)' : myPlayer.buffs.transformUsedThisCombat ? 'var(--text-dim)' : 'var(--accent-gold-bright)',
+                      }}>
                         {isTransformed
                           ? `✨ ${transform?.name} (${myPlayer.buffs.transformTurnsLeft}t)`
                           : myPlayer.buffs.transformUsedThisCombat
                             ? '🌟 Essência Esgotada'
                             : `🌟 TRANSFORMAR: ${transform?.name}`}
                       </div>
-                      <div style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-ui)' }}>
-                        {isTransformed
-                          ? 'Skills substituídas por versões divinas'
-                          : myPlayer.buffs.transformUsedThisCombat
-                            ? 'Uso único por combate'
-                            : `6 turnos · ATK×${transform?.atkMultiplier} DEF×${transform?.defMultiplier} +${transform?.hpBonusFlat}HP`}
+                      <div style={{ fontSize: 9, color: 'var(--text-dim)', fontFamily: 'var(--font-ui)' }}>
+                        {isTransformed ? 'Skills divinas ativas' : myPlayer.buffs.transformUsedThisCombat ? '1 uso por combate' : `6t · ATK×${transform?.atkMultiplier} DEF×${transform?.defMultiplier}`}
                       </div>
                     </div>
                     {!myPlayer.buffs.transformUsedThisCombat && !isTransformed && (
-                      <span style={{ fontFamily: 'var(--font-ui)', fontSize: 10, color: 'var(--accent-gold-bright)',
-                        background: 'rgba(212,160,23,0.2)', padding: '2px 6px', borderRadius: 3, border: '1px solid rgba(212,160,23,0.4)' }}>
-                        1x
-                      </span>
+                      <span style={{ fontFamily: 'var(--font-ui)', fontSize: 10, color: 'var(--accent-gold-bright)', background: 'rgba(212,160,23,0.2)', padding: '2px 5px', borderRadius: 3 }}>1x</span>
                     )}
                   </button>
                 )}
 
-                <button
-                  className={styles.attackBtn}
-                  onClick={doAttack}
-                  disabled={!selectedTarget || !aliveM.find(m => m.id === selectedTarget)}
-                >
-                  {isTransformed ? `${transform?.emoji} ` : '⚔️ '}Atacar {selectedTarget && aliveM.find(m => m.id === selectedTarget)
-                    ? aliveM.find(m => m.id === selectedTarget)!.name : '(selecione inimigo)'}
+                {/* Attack */}
+                <button className={styles.attackBtn} onClick={doAttack}
+                  disabled={!selectedTarget || !aliveM.find(m => m.id === selectedTarget)}>
+                  {isTransformed ? `${transform?.emoji} ` : '⚔️ '}
+                  Atacar {selectedTarget && aliveM.find(m => m.id === selectedTarget)
+                    ? aliveM.find(m => m.id === selectedTarget)!.name
+                    : '(selecione inimigo)'}
                 </button>
 
+                {/* Potions */}
                 {myPotions.length > 0 && (
                   <div className={styles.potionRow}>
                     {myPotions.map(pot => (
@@ -323,94 +305,54 @@ export default function Combat({ gameState, myId, onAction, onReset, onClearUlt,
                   </div>
                 )}
 
-                {/* Skills — transformed or normal */}
+                {/* Skills */}
                 <div className={styles.skillGrid}>
                   {isTransformed && transform ? (
-                    // Transform skills
                     transform.skillOverrides.map((skill, i) => {
                       const canUse = myPlayer.mp >= skill.mpCost;
                       return (
-                        <button
-                          key={i}
-                          className={[
-                            styles.skillBtn,
-                            styles.transformSkillBtn,
-                            selectedSkillIdx === i ? styles.skillSelected : '',
-                          ].join(' ')}
-                          onClick={() => pickSkill(i)}
-                          disabled={!canUse}
-                          title={skill.description}
-                        >
+                        <button key={i}
+                          className={[styles.skillBtn, styles.transformSkillBtn, selectedSkillIdx === i ? styles.skillSelected : ''].join(' ')}
+                          onClick={() => pickSkill(i)} disabled={!canUse} title={skill.description}>
                           <span className={styles.skillEmoji}>{skill.emoji}</span>
                           <span className={styles.skillName}>{skill.name}</span>
-                          {skill.targetAlly && (
-                            <span style={{ fontSize: 10, color: 'var(--accent-green-bright)',
-                              background: 'rgba(39,174,96,0.15)', padding: '1px 4px', borderRadius: 3 }}>aliado</span>
-                          )}
-                          {skill.mpCost > 0 && <span className={styles.skillMp} style={{ color: 'var(--accent-gold-bright)', background: 'rgba(212,160,23,0.15)', border: '1px solid rgba(212,160,23,0.3)' }}>{skill.mpCost}MP</span>}
+                          {skill.targetAlly && <span className={styles.allyTag}>aliado</span>}
+                          {skill.mpCost > 0 && <span className={styles.skillMp} style={{ color: 'var(--accent-gold-bright)', background: 'rgba(212,160,23,0.15)' }}>{skill.mpCost}MP</span>}
                         </button>
                       );
                     })
                   ) : (
-                    // Normal skills
                     SKILLS[myPlayer.classType].map((skill, i) => {
-                      const cost = skill.mpCost;
-                      const canUse = myPlayer.mp >= cost;
+                      const canUse = myPlayer.mp >= skill.mpCost;
                       const isAlly = !!skill.targetAlly;
                       const isUlt = skill.effect === 'ult';
                       const ultLocked = isUlt && myPlayer.level < (skill.ultLevel ?? 3);
-                      const ultUnlocked = isUlt && !ultLocked;
-
-                      if (isUlt) {
-                        return (
-                          <button
-                            key={i}
-                            className={[
-                              styles.skillBtn,
-                              styles.ultBtn,
-                              ultLocked ? styles.ultLocked : '',
-                              selectedSkillIdx === i ? styles.skillSelected : '',
-                              ultUnlocked && canUse ? styles.ultReady : '',
-                            ].join(' ')}
-                            onClick={() => !ultLocked && pickSkill(i)}
-                            disabled={ultLocked || !canUse}
-                            title={ultLocked ? `🔒 Nível ${skill.ultLevel} necessário` : skill.description}
-                          >
-                            <span className={styles.skillEmoji}>{skill.emoji}</span>
-                            <div style={{ flex: 1, textAlign: 'left' }}>
-                              <div style={{ fontFamily: 'var(--font-display)', fontSize: 12, color: ultLocked ? 'var(--text-dim)' : (ultUnlocked ? skill.ultColor ?? 'var(--accent-gold-bright)' : 'inherit'), letterSpacing: '0.08em', marginBottom: 1 }}>
-                                {ultLocked ? `🔒 ${skill.name}` : `⚡ ${skill.name}`}
-                              </div>
-                              {ultLocked && <div style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-ui)' }}>Nível {skill.ultLevel} necessário</div>}
-                            </div>
-                            {!ultLocked && cost > 0 && (
-                              <span className={styles.skillMp} style={{ background: 'rgba(212,160,23,0.15)', color: 'var(--accent-gold-bright)', border: '1px solid rgba(212,160,23,0.4)' }}>
-                                {cost}MP
-                              </span>
-                            )}
-                          </button>
-                        );
-                      }
+                      const ultReady  = isUlt && !ultLocked && canUse;
 
                       return (
-                        <button
-                          key={i}
+                        <button key={i}
                           className={[
                             styles.skillBtn,
                             i >= 3 ? styles.specialBtn : '',
                             selectedSkillIdx === i ? styles.skillSelected : '',
                             isAlly ? styles.allySkillBtn : '',
+                            isUlt ? styles.ultBtn : '',
+                            isUlt && ultReady ? styles.ultReady : '',
+                            isUlt && ultLocked ? styles.ultLocked : '',
                           ].join(' ')}
-                          onClick={() => pickSkill(i)}
-                          disabled={!canUse}
-                          title={skill.description}
-                        >
+                          onClick={() => !ultLocked && pickSkill(i)}
+                          disabled={ultLocked || !canUse}
+                          title={ultLocked ? `Nível ${skill.ultLevel} necessário` : skill.description}>
                           <span className={styles.skillEmoji}>{skill.emoji}</span>
-                          <span className={styles.skillName}>{skill.name}</span>
-                          {isAlly && (
-                            <span style={{ fontSize: 10, color: 'var(--accent-green-bright)', background: 'rgba(39,174,96,0.15)', padding: '1px 4px', borderRadius: 3 }}>aliado</span>
+                          <span className={styles.skillName}>
+                            {isUlt ? (ultLocked ? `🔒 ${skill.name}` : `⚡ ${skill.name}`) : skill.name}
+                          </span>
+                          {isAlly && <span className={styles.allyTag}>aliado</span>}
+                          {skill.mpCost > 0 && (
+                            <span className={styles.skillMp} style={isUlt ? { color: 'var(--accent-gold-bright)', background: 'rgba(212,160,23,0.15)', border: '1px solid rgba(212,160,23,0.3)' } : {}}>
+                              {skill.mpCost}MP
+                            </span>
                           )}
-                          {cost > 0 && <span className={styles.skillMp}>{cost}MP</span>}
                         </button>
                       );
                     })
@@ -419,29 +361,29 @@ export default function Combat({ gameState, myId, onAction, onReset, onClearUlt,
 
                 {selectedSkillIdx !== null && (
                   <button
-                    className={isTransformed ? styles.useUltBtn : (currentSkills[selectedSkillIdx]?.effect === 'ult' ? styles.useUltBtn : styles.useSkillBtn)}
+                    className={currentSkills[selectedSkillIdx]?.effect === 'ult' || isTransformed ? styles.useUltBtn : styles.useSkillBtn}
                     onClick={doSkill}
                     disabled={(needsAllyTarget || needsEnemyTarget) && !selectedTarget}
                     style={isTransformed ? { background: `linear-gradient(135deg, ${transform?.ultColor}88, ${transform?.ultColor})` } : {}}
                   >
-                    {isTransformed ? `${transform?.emoji} Usar: ` : (currentSkills[selectedSkillIdx]?.effect === 'ult' ? '🌟 ATIVAR ULTIMATE: ' : '✨ Usar: ')}
+                    {isTransformed ? `${transform?.emoji} Usar: ` : currentSkills[selectedSkillIdx]?.effect === 'ult' ? '🌟 ATIVAR: ' : '✨ Usar: '}
                     {currentSkills[selectedSkillIdx]?.name}
                     {(needsAllyTarget || needsEnemyTarget) && !selectedTarget ? ' (selecione alvo)' : ''}
                   </button>
                 )}
               </div>
-            )}
-
-            {!canAct && myPlayer.isAlive && !isMyTurn && activePl && (
-              <div className={styles.waitingPanel}>
-                <p>⌛ Aguardando <strong>{activePl.name}</strong> agir...</p>
-              </div>
+            ) : (
+              myPlayer.isAlive && !isMyTurn && activePl && (
+                <div className={styles.waitingPanel}>
+                  ⌛ Aguardando <strong>{activePl.name}</strong> {CLASSES[activePl.classType].emoji} agir...
+                </div>
+              )
             )}
           </div>
         )}
       </div>
 
-      {/* Players row */}
+      {/* PLAYERS ROW */}
       <div className={styles.playersRow}>
         {gameState.playerOrder.map(pid => {
           const p = gameState.players[pid];
@@ -452,8 +394,7 @@ export default function Combat({ gameState, myId, onAction, onReset, onClearUlt,
           const allySelectable = canAct && targetMode === 'ally' && needsAllyTarget;
           const allySelected = selectedTarget === pid && targetMode === 'ally';
           return (
-            <div
-              key={pid}
+            <div key={pid}
               className={[
                 styles.playerMini,
                 !p.isAlive ? styles.deadPlayer : '',
@@ -468,35 +409,52 @@ export default function Combat({ gameState, myId, onAction, onReset, onClearUlt,
                 <span>{pTransformed ? pTransform.emoji : CLASSES[p.classType].emoji}</span>
                 <span className={styles.miniName}>{p.name}</span>
                 {pid === myId && <span className={styles.youTag}>você</span>}
-                <span style={{ fontFamily: 'var(--font-ui)', fontSize: 9, color: 'var(--accent-gold)', background: 'rgba(212,160,23,0.1)', padding: '1px 4px', borderRadius: 3 }}>
-                  Nv.{p.level}
-                </span>
+                <span className={styles.levelTag}>Nv.{p.level}</span>
                 {isActive && p.isAlive && <span className={styles.activeDot} />}
                 {!p.isAlive && <span>💀</span>}
-                {pTransformed && <span title={`Transformado ${p.buffs.transformTurnsLeft}t`}>🌟</span>}
-                {p.buffs.wallTurnsLeft > 0         && <span title="Muralha">🏰</span>}
-                {p.buffs.dodgeTurnsLeft > 0         && <span title="Esquiva">💨</span>}
-                {p.buffs.regenTurnsLeft > 0         && <span title="Regenerando">♻️</span>}
-                {p.buffs.tempBonusTurns > 0         && <span title="Buff ATK/DEF">✨</span>}
-                {p.buffs.necroBonusTurnsLeft > 0    && <span title="Buff Necromante">💀</span>}
-                {p.buffs.counterReflect > 0         && <span title="Contra-Ataque">🔄</span>}
-                {(p.buffs.soulCount ?? 0) > 0       && <span title={`${p.buffs.soulCount} Alma(s)`} style={{ fontSize: 11, color: '#8e44ad', fontFamily: 'var(--font-ui)', background: 'rgba(142,68,173,.2)', padding: '1px 3px', borderRadius: 3 }}>💀{p.buffs.soulCount}</span>}
-                {(p.buffs.summonCount ?? 0) > 0     && <span title={`${p.buffs.summonCount} Aliado(s)`} style={{ fontSize: 11, color: '#a0522d', fontFamily: 'var(--font-ui)', background: 'rgba(160,82,45,.2)', padding: '1px 3px', borderRadius: 3 }}>🐾{p.buffs.summonCount}</span>}
-                {(p.buffs.spiritStacks ?? 0) > 0    && <span title={`${p.buffs.spiritStacks} Carga(s) Espiritual`} style={{ fontSize: 11, color: '#5f9ea0', fontFamily: 'var(--font-ui)', background: 'rgba(95,158,160,.2)', padding: '1px 3px', borderRadius: 3 }}>🌀{p.buffs.spiritStacks}</span>}
-                {(p.buffs.cloneTurnsLeft ?? 0) > 0  && <span title="Clone Ativo">👤</span>}
               </div>
               <SmallBar value={p.hp} max={p.maxHp} color="var(--hp-color)" />
               <SmallBar value={p.mp} max={p.maxMp} color="var(--mp-color)" />
+              {/* Mini buff icons */}
+              <div className={styles.miniBuffs}>
+                {pTransformed && <span className={styles.miniBuff} title="Transformado">🌟</span>}
+                {p.buffs.wallTurnsLeft > 0 && <span className={styles.miniBuff} title="Muralha">🏰</span>}
+                {p.buffs.dodgeTurnsLeft > 0 && <span className={styles.miniBuff} title="Esquiva">💨</span>}
+                {p.buffs.regenTurnsLeft > 0 && <span className={styles.miniBuff} title="Regen">♻️</span>}
+                {p.buffs.tempBonusTurns > 0 && <span className={styles.miniBuff} title="Buffado">✨</span>}
+                {p.buffs.counterReflect > 0 && <span className={styles.miniBuff} title="Contra-Ataque">🔄</span>}
+                {(p.buffs.cloneTurnsLeft ?? 0) > 0 && <span className={styles.miniBuff} title="Clone">👤</span>}
+                {(p.buffs.soulCount ?? 0) > 0 && (
+                  <span className={styles.miniBuff} title={`${p.buffs.soulCount} almas`} style={{ color: '#8e44ad', fontSize: 10, fontFamily: 'var(--font-ui)' }}>
+                    💀{p.buffs.soulCount}
+                  </span>
+                )}
+                {(p.buffs.summonCount ?? 0) > 0 && (
+                  <span className={styles.miniBuff} style={{ fontSize: 10, fontFamily: 'var(--font-ui)', color: '#a0522d' }}>
+                    🐾{p.buffs.summonCount}
+                  </span>
+                )}
+                {(p.buffs.spiritStacks ?? 0) > 0 && (
+                  <span className={styles.miniBuff} style={{ fontSize: 10, fontFamily: 'var(--font-ui)', color: '#5f9ea0' }}>
+                    🌀{p.buffs.spiritStacks}
+                  </span>
+                )}
+              </div>
             </div>
           );
         })}
       </div>
 
-      {/* Combat Log */}
+      {/* COMBAT LOG */}
       <div className={styles.logPanel}>
-        <div className={styles.logTitle}>📜 Log de Combate</div>
-        <div className={styles.logScroll}>
-          {gameState.combatLog.slice().reverse().slice(0, 25).map(e => (
+        <div className={styles.logTitle}>
+          📜 Registro de Combate
+          <span style={{ color: 'var(--accent-gold)', fontFamily: 'var(--font-ui)', fontSize: 9 }}>
+            {gameState.combatLog.length} entradas
+          </span>
+        </div>
+        <div className={styles.logScroll} ref={logScrollRef}>
+          {gameState.combatLog.slice(-40).map(e => (
             <div key={e.id} className={`${styles.logLine} ${styles['log_' + e.type]}`}>
               <span className={styles.logTurn}>[T{e.turn}]</span> {e.message}
             </div>
@@ -507,10 +465,12 @@ export default function Combat({ gameState, myId, onAction, onReset, onClearUlt,
   );
 }
 
+/* ═══ SUB-COMPONENTS ══════════════════════════════════════════════ */
+
 function MonsterCard({ monster, isSelected, canSelect, onClick }: {
   monster: Monster; isSelected: boolean; canSelect: boolean; onClick: () => void;
 }) {
-  const hp = (monster.hp / monster.maxHp) * 100;
+  const hp  = (monster.hp / monster.maxHp) * 100;
   const eff = monster.effects ?? [];
   const poisoned = eff.some((e: MonsterEffect) => e.type === 'poisoned');
   const stunned  = eff.some((e: MonsterEffect) => e.type === 'stunned');
@@ -524,78 +484,63 @@ function MonsterCard({ monster, isSelected, canSelect, onClick }: {
       className={[
         styles.monsterCard,
         isSelected ? styles.monsterSelected : '',
-        isDead      ? styles.monsterDead    : '',
-        monster.isBoss ? styles.bossCard   : '',
-        canSelect && !isDead ? styles.monsterHoverable : '',
+        isDead ? styles.monsterDead : '',
+        monster.isBoss ? styles.bossCard : '',
+        canSelect && !isDead ? styles.monsterHoverable : styles.monsterNoTarget,
       ].join(' ')}
       onClick={isDead ? undefined : onClick}
     >
       {monster.isBoss && <div className={styles.bossBadge}>BOSS</div>}
-      <div className={styles.monsterEmoji}>{monster.emoji}</div>
+      <span className={styles.monsterEmoji}>{monster.emoji}</span>
       <div className={styles.monsterName}>{monster.name}</div>
       <div className={styles.monsterLv}>Nv.{monster.level}</div>
-      <div className={styles.monsterHpTrack}>
+      <div className={styles.monsterHpBar}>
         <div className={styles.monsterHpFill} style={{
           width: `${hp}%`,
-          background: hp > 50 ? 'var(--accent-green)' : hp > 25 ? '#f39c12' : 'var(--accent-red)',
+          background: hp > 60 ? 'var(--accent-green)' : hp > 30 ? '#f39c12' : 'var(--accent-red)',
         }} />
       </div>
       <div className={styles.monsterHpText}>{monster.hp}/{monster.maxHp}</div>
       <div className={styles.monsterStats}>⚔{monster.attack} 🛡{monster.defense}</div>
       {(poisoned || stunned || cursed || marked || slowed) && (
-        <div style={{ display: 'flex', gap: 3, justifyContent: 'center', marginTop: 4, flexWrap: 'wrap' }}>
-          {poisoned && <span title="Envenenado">☠️</span>}
-          {stunned  && <span title="Atordoado">😵</span>}
-          {cursed   && <span title="Amaldiçoado">🔮</span>}
-          {marked   && <span title="Marcado">🎯</span>}
-          {slowed   && <span title="Lento">❄️</span>}
+        <div className={styles.monsterEffects}>
+          {poisoned && <span className={styles.effectIcon}>☠️</span>}
+          {stunned  && <span className={styles.effectIcon}>😵</span>}
+          {cursed   && <span className={styles.effectIcon}>🔮</span>}
+          {marked   && <span className={styles.effectIcon}>🎯</span>}
+          {slowed   && <span className={styles.effectIcon}>❄️</span>}
         </div>
       )}
     </div>
   );
 }
 
-function BuffBar({ player }: { player: GameState['players'][string] }) {
+function BuffChips({ player }: { player: GameState['players'][string] }) {
   const b = player.buffs;
   const chips: { label: string; color: string; bg: string }[] = [];
- 
   if (b.tempBonusTurns > 0) {
-    if (b.tempAtkBonus > 0)  chips.push({ label: `⚔️+${b.tempAtkBonus}atk (${b.tempBonusTurns}t)`, color: '#f0c040', bg: 'rgba(212,160,23,.15)' });
-    if (b.tempDefBonus > 0)  chips.push({ label: `🛡️+${b.tempDefBonus}def (${b.tempBonusTurns}t)`, color: '#3498db', bg: 'rgba(52,152,219,.15)' });
-    if (b.tempDefBonus < 0)  chips.push({ label: `🛡️${b.tempDefBonus}def (${b.tempBonusTurns}t)`, color: '#e74c3c', bg: 'rgba(231,76,60,.15)' });
+    if (b.tempAtkBonus > 0)  chips.push({ label: `⚔️+${b.tempAtkBonus}atk(${b.tempBonusTurns}t)`, color: '#f0c040', bg: 'rgba(212,160,23,.1)' });
+    if (b.tempDefBonus > 0)  chips.push({ label: `🛡️+${b.tempDefBonus}def(${b.tempBonusTurns}t)`, color: '#3498db', bg: 'rgba(52,152,219,.1)' });
+    if (b.tempDefBonus < 0)  chips.push({ label: `🛡️${b.tempDefBonus}def`, color: '#e74c3c', bg: 'rgba(231,76,60,.1)' });
   }
-  if (b.regenTurnsLeft > 0)      chips.push({ label: `♻️+${b.regenHpPerTurn}hp/t (${b.regenTurnsLeft}t)`,      color: '#2ecc71', bg: 'rgba(39,174,96,.15)' });
-  if (b.wallTurnsLeft > 0)       chips.push({ label: `🏰 Muralha (${b.wallTurnsLeft}t)`,                        color: '#bdc3c7', bg: 'rgba(127,140,141,.2)' });
-  if (b.dodgeTurnsLeft > 0)      chips.push({ label: `💨 Esquiva (${b.dodgeTurnsLeft}t)`,                       color: '#1abc9c', bg: 'rgba(26,188,156,.15)' });
-  if (b.necroBonusTurnsLeft > 0) chips.push({ label: `💀+${b.necroBonusDmg}dmg (${b.necroBonusTurnsLeft}t)`,   color: '#9b59b6', bg: 'rgba(142,68,173,.15)' });
-  if (b.aimBonus > 0)            chips.push({ label: `🦅 Mira+${b.aimBonus}`,                                   color: '#3498db', bg: 'rgba(52,152,219,.15)' });
-  if (b.counterReflect > 0)      chips.push({ label: `🔄 Contra-atk ${Math.round(b.counterReflect*100)}%`,      color: '#e67e22', bg: 'rgba(230,126,34,.15)' });
-  // FIX: always show soul count for necromancer, even at 0, so it's visible
-  if (player.classType === 'necromancer') {
-    chips.push({ label: `💀 ${b.soulCount ?? 0}/5 alma(s)`, color: '#8e44ad', bg: 'rgba(142,68,173,.2)' });
-  } else if ((b.soulCount ?? 0) > 0) {
-    chips.push({ label: `💀 ${b.soulCount} alma(s)`, color: '#8e44ad', bg: 'rgba(142,68,173,.2)' });
-  }
-  // Animalist summon count — always show for animalist
-  if (player.classType === 'animalist') {
-    chips.push({ label: `🐾 ${b.summonCount ?? 0}/3 aliados`, color: '#a0522d', bg: 'rgba(160,82,45,.2)' });
-  } else if ((b.summonCount ?? 0) > 0) {
-    chips.push({ label: `🐾 ${b.summonCount}/3 aliados`, color: '#a0522d', bg: 'rgba(160,82,45,.2)' });
-  }
-  // Shaman spirit stacks
-  if (player.classType === 'shaman') {
-    chips.push({ label: `🌀 ${b.spiritStacks ?? 0}/5 cargas`, color: '#5f9ea0', bg: 'rgba(95,158,160,.2)' });
-  } else if ((b.spiritStacks ?? 0) > 0) {
-    chips.push({ label: `🌀 ${b.spiritStacks}/5 cargas`, color: '#5f9ea0', bg: 'rgba(95,158,160,.2)' });
-  }
-  // Trickster clone
-  if ((b.cloneTurnsLeft ?? 0) > 0) chips.push({ label: `👤 Clone (${b.cloneTurnsLeft}t)`,                       color: '#da70d6', bg: 'rgba(218,112,214,.2)' });
- 
+  if (b.regenTurnsLeft > 0)      chips.push({ label: `♻️+${b.regenHpPerTurn}HP(${b.regenTurnsLeft}t)`, color: '#2ecc71', bg: 'rgba(39,174,96,.1)' });
+  if (b.wallTurnsLeft > 0)       chips.push({ label: `🏰Muralha(${b.wallTurnsLeft}t)`, color: '#bdc3c7', bg: 'rgba(127,140,141,.15)' });
+  if (b.dodgeTurnsLeft > 0)      chips.push({ label: `💨Esquiva(${b.dodgeTurnsLeft}t)`, color: '#1abc9c', bg: 'rgba(26,188,156,.1)' });
+  if (b.necroBonusTurnsLeft > 0) chips.push({ label: `💀+${b.necroBonusDmg}dmg(${b.necroBonusTurnsLeft}t)`, color: '#9b59b6', bg: 'rgba(142,68,173,.1)' });
+  if (b.aimBonus > 0)            chips.push({ label: `🦅Mira+${b.aimBonus}`, color: '#3498db', bg: 'rgba(52,152,219,.1)' });
+  if (b.counterReflect > 0)      chips.push({ label: `🔄Contra${Math.round(b.counterReflect*100)}%`, color: '#e67e22', bg: 'rgba(230,126,34,.1)' });
+  if (player.classType === 'necromancer') chips.push({ label: `💀${b.soulCount ?? 0}/5alma`, color: '#8e44ad', bg: 'rgba(142,68,173,.15)' });
+  else if ((b.soulCount ?? 0) > 0) chips.push({ label: `💀${b.soulCount}alma`, color: '#8e44ad', bg: 'rgba(142,68,173,.15)' });
+  if (player.classType === 'animalist') chips.push({ label: `🐾${b.summonCount ?? 0}/3aliados`, color: '#a0522d', bg: 'rgba(160,82,45,.15)' });
+  if (player.classType === 'shaman')    chips.push({ label: `🌀${b.spiritStacks ?? 0}/5cargas`, color: '#5f9ea0', bg: 'rgba(95,158,160,.15)' });
+  if ((b.cloneTurnsLeft ?? 0) > 0)      chips.push({ label: `👤Clone(${b.cloneTurnsLeft}t)`, color: '#da70d6', bg: 'rgba(218,112,214,.15)' });
   if (chips.length === 0) return null;
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
+    <div className={styles.buffRow}>
       {chips.map((c, i) => (
-        <span key={i} style={{ fontSize: 11, padding: '2px 6px', borderRadius: 4, color: c.color, background: c.bg, border: `1px solid ${c.color}55`, fontFamily: 'var(--font-ui)' }}>{c.label}</span>
+        <span key={i} className={styles.buffChip} style={{ color: c.color, background: c.bg, borderColor: `${c.color}44` }}>
+          {c.label}
+        </span>
       ))}
     </div>
   );
@@ -603,10 +548,10 @@ function BuffBar({ player }: { player: GameState['players'][string] }) {
 
 function StatBar({ value, max, color, label }: { value: number; max: number; color: string; label: string }) {
   return (
-    <div className={styles.statBarRow}>
+    <div className={styles.barRow}>
       <span className={styles.barLabel}>{label}</span>
       <div className={styles.barTrack}>
-        <div className={styles.barFill} style={{ width: `${Math.max(0, (value / max) * 100)}%`, background: color }} />
+        <div className={styles.barFill} style={{ width: `${Math.max(0,(value/max)*100)}%`, background: color }} />
       </div>
       <span className={styles.barText}>{value}/{max}</span>
     </div>
@@ -615,8 +560,8 @@ function StatBar({ value, max, color, label }: { value: number; max: number; col
 
 function SmallBar({ value, max, color }: { value: number; max: number; color: string }) {
   return (
-    <div className={styles.smallBarTrack}>
-      <div className={styles.smallBarFill} style={{ width: `${Math.max(0, (value / max) * 100)}%`, background: color }} />
+    <div className={styles.smallBar}>
+      <div className={styles.smallBarFill} style={{ width: `${Math.max(0,(value/max)*100)}%`, background: color }} />
     </div>
   );
 }
