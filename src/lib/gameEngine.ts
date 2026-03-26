@@ -365,6 +365,7 @@ export function processPlayerAction(
 
   // ── BASIC ATTACK ──
   if (action.type === 'attack') {
+    // FIX: only allow targeting real enemies, not summons
     const mIdx = state.currentMonsters.findIndex(m => m.id === action.targetId && m.hp > 0 && !m.isSummon);
     if (mIdx === -1) return state;
     const target = state.currentMonsters[mIdx];
@@ -419,7 +420,7 @@ export function processPlayerAction(
         return state;
       }
       if ((p.buffs.soulCount ?? 0) <= 0) {
-        log(state, `❌ ${p.name}: Sem Almas! Mate inimigos para acumular almas. [${p.buffs.soulCount}/5]`, 'system');
+        log(state, `❌ ${p.name}: Sem Almas! Mate inimigos para acumular almas. [${p.buffs.soulCount ?? 0}/5]`, 'system');
         return state;
       }
       p.mp -= skill.mpCost;
@@ -430,7 +431,7 @@ export function processPlayerAction(
         ? spawnNecroShadow(lastDead, playerId)
         : spawnGenericShadow(playerId, p.level, p.attack);
 
-      p.buffs = { ...p.buffs, soulCount: Math.max(0, p.buffs.soulCount - 1) };
+      p.buffs = { ...p.buffs, soulCount: Math.max(0, (p.buffs.soulCount ?? 0) - 1) };
       state.players[playerId] = p;
 
       // Add to currentMonsters (allied summon)
@@ -576,6 +577,7 @@ export function processPlayerAction(
           return newM;
         });
       } else {
+        // FIX: only allow targeting real enemies, not summons
         const mIdx = state.currentMonsters.findIndex(m => m.id === action.targetId && m.hp > 0 && !m.isSummon);
         if (mIdx !== -1) {
           const target = state.currentMonsters[mIdx];
@@ -686,6 +688,7 @@ function processTransformSkill(state: GameState, playerId: string, p: Player, sI
         return newM;
       });
     } else {
+      // FIX: only allow targeting real enemies, not summons
       const mIdx = state.currentMonsters.findIndex(m => m.id === action.targetId && m.hp > 0 && !m.isSummon);
       if (mIdx !== -1) {
         const target = state.currentMonsters[mIdx];
@@ -796,6 +799,17 @@ function applyTransformSkillEffects(state: GameState, playerId: string, p: Playe
   if (eff === 'ult' && p.classType === 'guardian') { Object.keys(state.players).forEach(pid => { const tp = state.players[pid]; if (!tp.isAlive) return; state.players[pid] = { ...tp, buffs: { ...tp.buffs, guardianUltTurnsLeft: 4 } }; }); log(state, `🗿 BASTIÃO DO DEUS! Invulnerável por 4 turnos!`, 'level_up'); }
   if (eff === 'ult' && p.classType === 'bard') { Object.keys(state.players).forEach(pid => { const tp = state.players[pid]; if (!tp.isAlive) return; const h = Math.min(tp.maxHp - tp.hp, 80); state.players[pid] = { ...tp, hp: tp.hp + h, buffs: { ...tp.buffs, tempAtkBonus: tp.buffs.tempAtkBonus + 20, tempDefBonus: tp.buffs.tempDefBonus + 20, tempBonusTurns: Math.max(tp.buffs.tempBonusTurns, 5), regenHpPerTurn: tp.buffs.regenHpPerTurn + 30, regenTurnsLeft: Math.max(tp.buffs.regenTurnsLeft, 4) } }; log(state, `🎼 ${tp.name}: +20ATK +20DEF +${h}HP`, 'player_action'); }); }
   if (eff === 'ult' && p.classType === 'necromancer') { const healAmt = Math.min(p.maxHp - p.hp, skill.heal ?? 60); p.hp += healAmt; state.players[playerId] = { ...state.players[playerId], hp: p.hp }; if (healAmt > 0) log(state, `🩸 ${p.name} drena vida divina! +${healAmt}HP!`, 'player_action'); }
+  // FIX: summon_animal in transform skill for animalist
+  if (eff === 'summon_animal' && skill.summonAnimalId) {
+    const MAX_SUMMONS = 3;
+    const owner = state.players[playerId];
+    if (owner && (owner.buffs.summonCount ?? 0) < MAX_SUMMONS) {
+      const animal = spawnAnimalSummon(skill.summonAnimalId, playerId, owner.level, owner.attack);
+      state.players[playerId] = { ...owner, buffs: { ...owner.buffs, summonCount: (owner.buffs.summonCount ?? 0) + 1 } };
+      state.currentMonsters = [...state.currentMonsters, animal];
+      log(state, `🐾 ${owner.name} [${transform.emoji}] invoca ${animal.emoji} ${animal.name}!`, 'player_action');
+    }
+  }
 }
 
 // ─── boss ultimate execution ──────────────────────────────────────────────────
@@ -871,15 +885,11 @@ function tickSummonDurations(state: GameState): void {
     if (newDur <= 0) {
       const label = m.isNecroShadow ? `👻 A sombra ${m.name} se dissipa!` : `💨 ${m.emoji}${m.name} retorna ao além.`;
       log(state, label, 'system');
-      // decrement owner's summon count
-      if (m.summonOwnerId) {
+      // decrement owner's summon count for animals only
+      if (m.summonOwnerId && !m.isNecroShadow) {
         const owner = state.players[m.summonOwnerId];
         if (owner) {
-          const key = m.isNecroShadow ? 'soulCount' : 'summonCount';
-          // only decrement summonCount for animals
-          if (!m.isNecroShadow) {
-            state.players[m.summonOwnerId] = { ...owner, buffs: { ...owner.buffs, summonCount: Math.max(0, owner.buffs.summonCount - 1) } };
-          }
+          state.players[m.summonOwnerId] = { ...owner, buffs: { ...owner.buffs, summonCount: Math.max(0, (owner.buffs.summonCount ?? 0) - 1) } };
         }
       }
       return { ...m, hp: 0 };
@@ -893,9 +903,6 @@ function tickSummonDurations(state: GameState): void {
 function processMonsterTurns(state: GameState): void {
   state.turnPhase = 'monster_turns';
   log(state, `👹 Fase dos Monstros!`, 'system');
-
-  // Record last killed monster for necro shadow (reset each turn)
-  (state as any).__lastKilledMonster = undefined;
 
   const aliveMonsters = state.currentMonsters.filter(m => m.hp > 0 && !m.isSummon);
   const alivePlayers = () => Object.values(state.players).filter(p => p.isAlive);
@@ -1050,7 +1057,8 @@ function processMonsterTurns(state: GameState): void {
       if (e.type === 'poisoned' && e.damage) {
         hp = Math.max(0, hp - e.damage);
         log(state, `☠️ ${monster.emoji}${monster.name} recebe ${e.damage} de veneno! (${e.turnsLeft - 1}t)`, 'system');
-        if (hp <= 0) { (state as any).__lastKilledMonster = monster; onMonsterDeath(state, monster); }
+        // FIX: call onMonsterDeath for poison kills too, granting souls
+        if (hp <= 0) { onMonsterDeath(state, monster); }
       }
       if (e.turnsLeft - 1 > 0) newEffects.push({ ...e, turnsLeft: e.turnsLeft - 1 });
     }
@@ -1173,6 +1181,10 @@ function checkBattleEnd(state: GameState): void {
 
       // Dismiss all summons on victory
       state.currentMonsters = state.currentMonsters.filter(m => !m.isSummon);
+      // FIX: reset summon/soul counts on victory
+      Object.keys(state.players).forEach(pid => {
+        state.players[pid] = { ...state.players[pid], buffs: { ...state.players[pid].buffs, summonCount: 0 } };
+      });
 
       Object.keys(state.players).forEach(pid => {
         const p = state.players[pid];
@@ -1199,38 +1211,46 @@ function checkBattleEnd(state: GameState): void {
   }
 }
 
+// FIX: centralized onMonsterDeath — handles real enemies only, always grants souls to necromancers
 function onMonsterDeath(state: GameState, monster: Monster): void {
-  // Track last killed real enemy for necro shadow
-  if (!monster.isSummon) {
-    (state as any).__lastKilledMonster = monster;
-    log(state, `💀 ${monster.emoji}${monster.name} foi derrotado!`, 'system');
-
-    // Grant soul to all alive necromancers
-    Object.keys(state.players).forEach(pid => {
-      const p = state.players[pid];
-      if (p.isAlive && p.classType === 'necromancer') {
-        const newSouls = Math.min(5, (p.buffs.soulCount ?? 0) + 1);
-        state.players[pid] = { ...p, buffs: { ...p.buffs, soulCount: newSouls } };
-        log(state, `💀 ${p.name} absorveu a alma de ${monster.name}! [${newSouls}/5 alma(s)]`, 'system');
-      }
-    });
-
-    distributeRewards(state, monster);
-  } else {
+  if (monster.isSummon) {
     // Summon died
     if (monster.isNecroShadow) {
       log(state, `👻 ${monster.name} se dissipou!`, 'system');
     } else {
       log(state, `💨 ${monster.emoji}${monster.name} foi derrotado.`, 'system');
-      // Decrement summon count for animalist
+      // FIX: decrement animalist summon count when their animal dies in combat
       if (monster.summonOwnerId) {
         const owner = state.players[monster.summonOwnerId];
         if (owner) {
-          state.players[monster.summonOwnerId] = { ...owner, buffs: { ...owner.buffs, summonCount: Math.max(0, owner.buffs.summonCount - 1) } };
+          state.players[monster.summonOwnerId] = {
+            ...owner,
+            buffs: { ...owner.buffs, summonCount: Math.max(0, (owner.buffs.summonCount ?? 0) - 1) }
+          };
+          log(state, `🐾 ${owner.name} perdeu 1 aliado! [${state.players[monster.summonOwnerId].buffs.summonCount}/3]`, 'system');
         }
       }
     }
+    return;
   }
+
+  // Real enemy death
+  log(state, `💀 ${monster.emoji}${monster.name} foi derrotado!`, 'system');
+
+  // FIX: track last killed monster for necro shadow (always update, not just in processMonsterTurns)
+  (state as any).__lastKilledMonster = monster;
+
+  // FIX: grant soul to ALL alive necromancers every time a real enemy dies
+  Object.keys(state.players).forEach(pid => {
+    const p = state.players[pid];
+    if (p.isAlive && p.classType === 'necromancer') {
+      const newSouls = Math.min(5, (p.buffs.soulCount ?? 0) + 1);
+      state.players[pid] = { ...p, buffs: { ...p.buffs, soulCount: newSouls } };
+      log(state, `💀 ${p.name} absorveu a alma de ${monster.name}! [${newSouls}/5 alma(s)]`, 'system');
+    }
+  });
+
+  distributeRewards(state, monster);
 }
 
 function distributeRewards(state: GameState, monster: Monster): void {
