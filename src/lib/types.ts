@@ -10,7 +10,10 @@ export type ClassType =
   | 'berserker'
   | 'guardian'
   | 'druid'
-  | 'bard';
+  | 'bard'
+  | 'animalist'
+  | 'shaman'
+  | 'trickster';
 
 export type MapId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
 
@@ -61,6 +64,14 @@ export interface PlayerBuffs {
   transformUsedThisCombat: boolean;
   // Guardian Ultimate - Complete Invulnerability
   guardianUltTurnsLeft: number;
+  // Necromancer soul counter
+  soulCount: number;
+  // Animalist / Summon tracking
+  summonCount: number;
+  // Shaman spirit stacks
+  spiritStacks: number;
+  // Trickster clone active
+  cloneTurnsLeft: number;
 }
 
 export const DEFAULT_BUFFS: PlayerBuffs = {
@@ -75,6 +86,10 @@ export const DEFAULT_BUFFS: PlayerBuffs = {
   transformTurnsLeft: 0,
   transformUsedThisCombat: false,
   guardianUltTurnsLeft: 0,
+  soulCount: 0,
+  summonCount: 0,
+  spiritStacks: 0,
+  cloneTurnsLeft: 0,
 };
 
 export interface Player {
@@ -155,6 +170,11 @@ export interface Monster {
   armorPierce?: number;
   regenPerTurn?: number;
   dropsTransformItem?: boolean;
+  // Summon / shadow flags
+  isSummon?: boolean;
+  summonOwnerId?: string;    // player id who owns this summon
+  summonDuration?: number;   // turns remaining
+  isNecroShadow?: boolean;   // spawned by necromancer Invocar Sombra
 }
 
 export interface TransformDefinition {
@@ -342,4 +362,9 @@ export type SkillEffect =
   | 'curse' | 'mark' | 'aim' | 'regen' | 'wall' | 'counter'
   | 'berserk' | 'dodge' | 'balada' | 'revive' | 'aoe_heal'
   | 'pierce' | 'ignore_half_def' | 'execute' | 'rage_scale'
-  | 'slow' | 'taunt' | 'ult';
+  | 'slow' | 'taunt' | 'ult'
+  | 'summon_shadow'   // necromancer: spawn ghost of killed enemy
+  | 'summon_animal'   // animalist: summon an animal ally
+  | 'spirit_stack'    // shaman: build spirit stacks
+  | 'clone'           // trickster: spawn a clone
+  | 'soul_harvest';   // necromancer: absorb soul from kill (passive trigger)

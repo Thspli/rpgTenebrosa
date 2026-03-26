@@ -160,6 +160,34 @@ export default function Combat({ gameState, myId, onAction, onReset, onClearUlt,
               />
             ))}
           </div>
+          {(() => {
+  const summons = gameState.currentMonsters.filter(m => m.isSummon && m.hp > 0);
+  if (summons.length === 0) return null;
+  return (
+    <div style={{ marginTop: 16 }}>
+      <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 13, color: 'var(--accent-green-bright)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 10 }}>
+        🤝 Aliados Invocados
+      </h3>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+        {summons.map(summon => (
+          <div key={summon.id} style={{
+            background: summon.isNecroShadow ? 'rgba(142,68,173,0.1)' : 'rgba(39,174,96,0.08)',
+            border: `1px solid ${summon.isNecroShadow ? 'rgba(142,68,173,0.5)' : 'rgba(39,174,96,0.4)'}`,
+            borderRadius: 8, padding: '10px 14px', minWidth: 110, textAlign: 'center',
+          }}>
+            <div style={{ fontSize: 28, marginBottom: 4 }}>{summon.emoji}</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: 11, color: summon.isNecroShadow ? '#9b59b6' : 'var(--accent-green-bright)', marginBottom: 4 }}>{summon.name}</div>
+            <div style={{ height: 5, background: 'var(--bg-dark)', borderRadius: 3, overflow: 'hidden', marginBottom: 4 }}>
+              <div style={{ height: '100%', background: summon.isNecroShadow ? '#8e44ad' : 'var(--accent-green)', width: `${(summon.hp / summon.maxHp) * 100}%`, borderRadius: 3 }} />
+            </div>
+            <div style={{ fontFamily: 'var(--font-ui)', fontSize: 10, color: 'var(--text-secondary)' }}>{summon.hp}/{summon.maxHp}</div>
+            <div style={{ fontFamily: 'var(--font-ui)', fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>⚔{summon.attack} ⏳{summon.summonDuration}t</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+})()}
         </div>
 
         {/* Action panel */}
@@ -522,19 +550,27 @@ function MonsterCard({ monster, isSelected, canSelect, onClick }: {
 function BuffBar({ player }: { player: GameState['players'][string] }) {
   const b = player.buffs;
   const chips: { label: string; color: string; bg: string }[] = [];
-
+ 
   if (b.tempBonusTurns > 0) {
     if (b.tempAtkBonus > 0)  chips.push({ label: `⚔️+${b.tempAtkBonus}atk (${b.tempBonusTurns}t)`, color: '#f0c040', bg: 'rgba(212,160,23,.15)' });
     if (b.tempDefBonus > 0)  chips.push({ label: `🛡️+${b.tempDefBonus}def (${b.tempBonusTurns}t)`, color: '#3498db', bg: 'rgba(52,152,219,.15)' });
     if (b.tempDefBonus < 0)  chips.push({ label: `🛡️${b.tempDefBonus}def (${b.tempBonusTurns}t)`, color: '#e74c3c', bg: 'rgba(231,76,60,.15)' });
   }
-  if (b.regenTurnsLeft > 0)     chips.push({ label: `♻️+${b.regenHpPerTurn}hp/t (${b.regenTurnsLeft}t)`, color: '#2ecc71', bg: 'rgba(39,174,96,.15)' });
-  if (b.wallTurnsLeft > 0)      chips.push({ label: `🏰 Muralha (${b.wallTurnsLeft}t)`,             color: '#bdc3c7', bg: 'rgba(127,140,141,.2)' });
-  if (b.dodgeTurnsLeft > 0)     chips.push({ label: `💨 Esquiva (${b.dodgeTurnsLeft}t)`,             color: '#1abc9c', bg: 'rgba(26,188,156,.15)' });
-  if (b.necroBonusTurnsLeft > 0)chips.push({ label: `💀+${b.necroBonusDmg}dmg (${b.necroBonusTurnsLeft}t)`, color: '#9b59b6', bg: 'rgba(142,68,173,.15)' });
-  if (b.aimBonus > 0)           chips.push({ label: `🦅 Mira+${b.aimBonus}`,                        color: '#3498db', bg: 'rgba(52,152,219,.15)' });
-  if (b.counterReflect > 0)     chips.push({ label: `🔄 Contra-atk ${Math.round(b.counterReflect*100)}%`, color: '#e67e22', bg: 'rgba(230,126,34,.15)' });
-
+  if (b.regenTurnsLeft > 0)      chips.push({ label: `♻️+${b.regenHpPerTurn}hp/t (${b.regenTurnsLeft}t)`,      color: '#2ecc71', bg: 'rgba(39,174,96,.15)' });
+  if (b.wallTurnsLeft > 0)       chips.push({ label: `🏰 Muralha (${b.wallTurnsLeft}t)`,                        color: '#bdc3c7', bg: 'rgba(127,140,141,.2)' });
+  if (b.dodgeTurnsLeft > 0)      chips.push({ label: `💨 Esquiva (${b.dodgeTurnsLeft}t)`,                       color: '#1abc9c', bg: 'rgba(26,188,156,.15)' });
+  if (b.necroBonusTurnsLeft > 0) chips.push({ label: `💀+${b.necroBonusDmg}dmg (${b.necroBonusTurnsLeft}t)`,   color: '#9b59b6', bg: 'rgba(142,68,173,.15)' });
+  if (b.aimBonus > 0)            chips.push({ label: `🦅 Mira+${b.aimBonus}`,                                   color: '#3498db', bg: 'rgba(52,152,219,.15)' });
+  if (b.counterReflect > 0)      chips.push({ label: `🔄 Contra-atk ${Math.round(b.counterReflect*100)}%`,      color: '#e67e22', bg: 'rgba(230,126,34,.15)' });
+  // Necromancer souls
+  if ((b.soulCount ?? 0) > 0)    chips.push({ label: `💀 ${b.soulCount} alma(s)`,                               color: '#8e44ad', bg: 'rgba(142,68,173,.2)'  });
+  // Animalist summon count
+  if ((b.summonCount ?? 0) > 0)  chips.push({ label: `🐾 ${b.summonCount}/3 aliados`,                           color: '#a0522d', bg: 'rgba(160,82,45,.2)'   });
+  // Shaman spirit stacks
+  if ((b.spiritStacks ?? 0) > 0) chips.push({ label: `🌀 ${b.spiritStacks}/5 cargas`,                           color: '#5f9ea0', bg: 'rgba(95,158,160,.2)'  });
+  // Trickster clone
+  if ((b.cloneTurnsLeft ?? 0) > 0) chips.push({ label: `👤 Clone (${b.cloneTurnsLeft}t)`,                       color: '#da70d6', bg: 'rgba(218,112,214,.2)' });
+ 
   if (chips.length === 0) return null;
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
