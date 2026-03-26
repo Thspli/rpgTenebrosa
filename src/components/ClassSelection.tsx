@@ -16,25 +16,52 @@ export default function ClassSelection({ gameState, myId, onSelectClass, onReady
   const selectedClass = myPlayer?.classType;
   const isReady = myPlayer?.isReady;
 
+  // Classes already picked by OTHER players
+  const takenClasses = new Set(
+    Object.values(gameState.players)
+      .filter(p => p.id !== myId && p.classType)
+      .map(p => p.classType)
+  );
+
   return (
     <div className={styles.container}>
       <div className={styles.header}>
         <h2 className={styles.title}>⚔ Escolha sua Classe</h2>
-        <p className={styles.subtitle}>12 classes disponíveis — cada uma com 6 habilidades únicas</p>
+        <p className={styles.subtitle}>12 classes disponíveis — cada classe só pode ser escolhida por um jogador</p>
       </div>
 
       <div className={styles.grid}>
         {(Object.entries(CLASSES) as [ClassType, typeof CLASSES[ClassType]][]).map(([key, cls]) => {
           const isSelected = selectedClass === key;
+          const isTaken = takenClasses.has(key) && !isSelected;
           const skills = SKILLS[key];
 
           return (
             <div
               key={key}
-              className={`${styles.card} ${isSelected ? styles.selected : ''}`}
-              onClick={() => !isReady && onSelectClass(key)}
-              style={{ '--cls-color': cls.color } as React.CSSProperties}
+              className={`${styles.card} ${isSelected ? styles.selected : ''} ${isTaken ? styles.takenCard : ''}`}
+              onClick={() => !isReady && !isTaken && onSelectClass(key)}
+              style={{ '--cls-color': isTaken ? '#3a3a3a' : cls.color } as React.CSSProperties}
+              title={isTaken ? 'Já escolhida por outro jogador' : ''}
             >
+              {isTaken && (
+                <div style={{
+                  position: 'absolute', inset: 0, zIndex: 5,
+                  background: 'rgba(5,5,8,0.75)',
+                  display: 'flex', flexDirection: 'column',
+                  alignItems: 'center', justifyContent: 'center',
+                  borderRadius: 10, gap: 6,
+                }}>
+                  <span style={{ fontSize: 24 }}>🔒</span>
+                  <span style={{ fontFamily: 'var(--font-ui)', fontSize: 11, color: 'var(--text-dim)', letterSpacing: '0.1em' }}>
+                    Ocupada
+                  </span>
+                  <span style={{ fontFamily: 'var(--font-ui)', fontSize: 11, color: 'var(--text-secondary)' }}>
+                    {Object.values(gameState.players).find(p => p.classType === key && p.id !== myId)?.name ?? ''}
+                  </span>
+                </div>
+              )}
+
               <div className={styles.cardHeader}>
                 <span className={styles.emoji}>{cls.emoji}</span>
                 <div>
@@ -50,7 +77,6 @@ export default function ClassSelection({ gameState, myId, onSelectClass, onReady
                 <StatBar label="DEF" value={cls.baseStats.defense} max={14}  color="var(--accent-blue-bright)" />
               </div>
 
-              {/* All 6 skills */}
               <div className={styles.skillList}>
                 {skills.map((sk, i) => (
                   <div key={i} className={`${styles.skill} ${i >= 3 ? styles.specialSkill : ''}`}>

@@ -72,6 +72,16 @@ export function joinRoom(state: GameState, playerId: string, name: string): Game
 
 export function selectClass(state: GameState, playerId: string, classType: ClassType): GameState {
   if (!state.players[playerId] || !state.unlockedClasses.includes(classType)) return state;
+
+  // ── UNIQUE CLASS: block if another player already has this class ──
+  const alreadyTaken = Object.values(state.players).some(
+    p => p.id !== playerId && p.classType === classType
+  );
+  if (alreadyTaken) {
+    log(state, `❌ ${CLASSES[classType].emoji} ${CLASSES[classType].name} já foi escolhida por outro jogador!`, 'system');
+    return state;
+  }
+
   const old = state.players[playerId];
   const p = createPlayer(playerId, old.name, classType);
   p.isReady = false;
@@ -197,7 +207,6 @@ export function useTransform(state: GameState, playerId: string): GameState {
 
   const transform = TRANSFORMS[player.classType];
 
-  // Trigger cutscene
   state.activeUlt = {
     playerId,
     playerName: player.name,
@@ -210,7 +219,6 @@ export function useTransform(state: GameState, playerId: string): GameState {
     isTransform: true,
   };
 
-  // Apply transformation buffs
   const atkBonus = Math.floor(player.attack * (transform.atkMultiplier - 1));
   const defBonus = Math.floor(player.defense * (transform.defMultiplier - 1));
   const newMaxHp = player.maxHp + transform.hpBonusFlat;
@@ -330,12 +338,10 @@ export function processPlayerAction(
   const player = state.players[playerId];
   if (!player?.isAlive) return state;
 
-  // Handle transform action
   if (action.type === 'use_transform') {
     return useTransform(state, playerId);
   }
 
-  // Get effective skills (transformed or normal)
   const isTransformed = player.buffs.transformTurnsLeft > 0;
   const transform = TRANSFORMS[player.classType];
   let p = { ...player, buffs: { ...player.buffs } };
@@ -381,7 +387,6 @@ export function processPlayerAction(
       p.buffs.aimBonus = 0;
     }
 
-    // Transform bonus label
     const transformLabel = isTransformed ? ` [🌟${transform.emoji}]` : '';
 
     let tDef = applyMonsterCurse(target);
@@ -404,12 +409,10 @@ export function processPlayerAction(
   if (action.type === 'skill') {
     const sIdx = action.skillIndex ?? 0;
 
-    // If transformed, use transform skills for indices 0-5
     if (isTransformed && sIdx < transform.skillOverrides.length) {
       return processTransformSkill(state, playerId, p, sIdx, action);
     }
 
-    // Normal skills
     const skills = SKILLS[p.classType];
     const skill = skills[sIdx];
     if (!skill) return state;
@@ -426,7 +429,6 @@ export function processPlayerAction(
     }
     p.mp -= mpCost;
 
-    // ── ULT TRIGGER ──
     if (skill.effect === 'ult' && skill.ultName && skill.ultLines) {
       state.activeUlt = {
         playerId,
@@ -445,7 +447,6 @@ export function processPlayerAction(
     let necroBuff = groupNecroBuff(state);
     let atkBonus = (p.buffs.tempBonusTurns > 0 ? p.buffs.tempAtkBonus : 0) + necroBuff;
 
-    // ── DAMAGE ──
     if (skill.damage !== undefined) {
       if (skill.aoe) {
         const dice = rollDice();
@@ -516,7 +517,6 @@ export function processPlayerAction(
       }
     }
 
-    // ── HEAL ──
     if (skill.heal !== undefined) {
       if (skill.effect === 'aoe_heal' || skill.effect === 'ult') {
         Object.keys(state.players).forEach(pid => {
@@ -546,10 +546,7 @@ export function processPlayerAction(
     }
 
     state.players[playerId] = p;
-
-    // Pure effects (same as before)
     applySkillEffects(state, playerId, p, skill, action);
-
     state.actionsThisTurn[playerId] = true;
     afterAction(state);
     return { ...state };
@@ -575,6 +572,21 @@ function processTransformSkill(
   }
   p.mp -= mpCost;
 
+  // ── TRANSFORM ULT trigger ──
+  if (skill.effect === 'ult' && skill.ultName && skill.ultLines) {
+    state.activeUlt = {
+      playerId,
+      playerName: p.name,
+      classType: p.classType,
+      ultName: skill.ultName,
+      ultLines: skill.ultLines,
+      ultColor: skill.ultColor ?? transform.ultColor,
+      ultBg: skill.ultBg ?? transform.ultBg,
+      ultEmoji: skill.emoji,
+    };
+    log(state, `🌟 ${p.name} [${transform.emoji}] usa a ULTIMATE DIVINA: ${skill.ultName}!`, 'level_up');
+  }
+
   const necroBuff = groupNecroBuff(state);
   const atkBonus = (p.buffs.tempBonusTurns > 0 ? p.buffs.tempAtkBonus : 0) + necroBuff;
 
@@ -585,8 +597,8 @@ function processTransformSkill(
       state.currentMonsters = state.currentMonsters.map(m => {
         if (m.hp <= 0) return m;
         let def = applyMonsterCurse(m);
-        if (skill.effect === 'pierce') def = 0;
-        else def = Math.floor(def * 0.4); // Transform AOE is stronger
+        if (skill.effect === 'pierce' || skill.effect === 'ult') def = 0;
+        else def = Math.floor(def * 0.4);
         const dmg = calculateDamage(p.attack + skill.damage! + atkBonus, def, dice);
         const newHp = Math.max(0, m.hp - dmg);
         log(state, `🌟 ${skill.emoji} ${skill.name} → ${m.emoji}${m.name}: ${dmg} dano`, 'player_action');
@@ -594,8 +606,8 @@ function processTransformSkill(
         if (skill.effect === 'poison' && skill.poisonDmg) {
           newM = addMonsterEffect(newM, { type: 'poisoned', damage: skill.poisonDmg, turnsLeft: skill.poisonTurns ?? 3 });
         }
-        if (skill.effect === 'stun' && Math.random() < 0.6) {
-          newM = addMonsterEffect(newM, { type: 'stunned', turnsLeft: skill.stunTurns ?? 2 });
+        if (skill.effect === 'stun' || skill.effect === 'ult') {
+          newM = addMonsterEffect(newM, { type: 'stunned', turnsLeft: skill.stunTurns ?? 1 });
           log(state, `😵 ${m.name} atordoado!`, 'system');
         }
         if (newHp <= 0) onMonsterDeath(state, m);
@@ -607,7 +619,7 @@ function processTransformSkill(
         const target = state.currentMonsters[mIdx];
         const dice = rollDice();
         let def = applyMonsterCurse(target);
-        if (skill.effect === 'pierce' || skill.effect === 'ignore_half_def') def = 0;
+        if (skill.effect === 'pierce' || skill.effect === 'ignore_half_def' || skill.effect === 'ult') def = 0;
         if (isMonsterStunned(target)) def = 0;
         const markMult = getMarkMult(target);
 
@@ -640,11 +652,17 @@ function processTransformSkill(
     }
   }
 
-  // Heal
+  // Heal (including ult aoe_heal / revive for transform ults like Druid and Paladin)
   if (skill.heal !== undefined) {
-    if (skill.effect === 'aoe_heal') {
+    if (skill.effect === 'aoe_heal' || skill.effect === 'ult') {
       Object.keys(state.players).forEach(pid => {
         const tp = state.players[pid];
+        if (skill.effect === 'ult' && !tp.isAlive) {
+          const revHp = Math.floor(tp.maxHp * 0.6);
+          state.players[pid] = { ...tp, isAlive: true, hp: revHp };
+          log(state, `✝️ ${p.name} [${transform.emoji}] ressuscita ${tp.name} com ${revHp}HP!`, 'player_action');
+          return;
+        }
         if (!tp.isAlive) return;
         const h = Math.min(tp.maxHp - tp.hp, skill.heal!);
         state.players[pid] = { ...tp, hp: tp.hp + h };
@@ -662,14 +680,11 @@ function processTransformSkill(
 
   state.players[playerId] = p;
 
-  // Apply transform skill effects
+  // Apply effects
   const eff = skill.effect;
   if (eff === 'defense_up' && skill.defBonus) {
     const cp = state.players[playerId];
-    state.players[playerId] = {
-      ...cp,
-      buffs: { ...cp.buffs, tempDefBonus: cp.buffs.tempDefBonus + skill.defBonus, tempBonusTurns: Math.max(cp.buffs.tempBonusTurns, skill.defBonusTurns ?? 3) }
-    };
+    state.players[playerId] = { ...cp, buffs: { ...cp.buffs, tempDefBonus: cp.buffs.tempDefBonus + skill.defBonus, tempBonusTurns: Math.max(cp.buffs.tempBonusTurns, skill.defBonusTurns ?? 3) } };
     log(state, `🛡️ ${p.name} [${transform.emoji}] ativa ${skill.emoji}! +${skill.defBonus} DEF!`, 'player_action');
   }
   if (eff === 'group_atk_up' && skill.atkGroupBonus) {
@@ -694,7 +709,7 @@ function processTransformSkill(
   }
   if (eff === 'aim' && skill.aimBonus) {
     state.players[playerId] = { ...state.players[playerId], buffs: { ...state.players[playerId].buffs, aimBonus: skill.aimBonus } };
-    log(state, `🦅 ${p.name} [${transform.emoji}] mira! Próximo ataque +${skill.aimBonus} dano!`, 'player_action');
+    log(state, `🦅 ${p.name} [${transform.emoji}] mira! +${skill.aimBonus} dano!`, 'player_action');
   }
   if (eff === 'wall' && skill.wallTurns) {
     Object.keys(state.players).forEach(pid => {
@@ -702,11 +717,11 @@ function processTransformSkill(
       if (!tp.isAlive) return;
       state.players[pid] = { ...tp, buffs: { ...tp.buffs, wallTurnsLeft: Math.max(tp.buffs.wallTurnsLeft, skill.wallTurns!) } };
     });
-    log(state, `🏰 ${p.name} [${transform.emoji}] Muralha Eterna! Grupo recebe 10% dano por ${skill.wallTurns}t!`, 'player_action');
+    log(state, `🏰 ${p.name} [${transform.emoji}] Muralha Eterna! por ${skill.wallTurns}t!`, 'player_action');
   }
   if (eff === 'counter' && skill.counterPct) {
     state.players[playerId] = { ...state.players[playerId], buffs: { ...state.players[playerId].buffs, counterReflect: skill.counterPct } };
-    log(state, `🔄 ${p.name} [${transform.emoji}] Contra-Ataque Divino! Reflete ${Math.round(skill.counterPct * 100)}% do próximo dano!`, 'player_action');
+    log(state, `🔄 ${p.name} [${transform.emoji}] Contra-Ataque Divino ${Math.round(skill.counterPct * 100)}%!`, 'player_action');
   }
   if (eff === 'stun' && !skill.damage && action.targetId) {
     const mIdx = state.currentMonsters.findIndex(m => m.id === action.targetId && m.hp > 0);
@@ -766,14 +781,13 @@ function processTransformSkill(
     const mIdx = state.currentMonsters.findIndex(m => m.id === action.targetId && m.hp > 0);
     if (mIdx !== -1) {
       state.currentMonsters[mIdx] = addMonsterEffect(state.currentMonsters[mIdx], { type: 'marked', damageMultiplier: skill.markMult ?? 2.5, turnsLeft: skill.markTurns ?? 4 });
-      log(state, `🎯 ${p.name} [${transform.emoji}] MARCA DA MORTE DIVINA! ×${skill.markMult} dano!`, 'player_action');
+      log(state, `🎯 ${p.name} [${transform.emoji}] MARCA DIVINA! ×${skill.markMult}!`, 'player_action');
     }
   }
   if (eff === 'slow' && action.targetId && !skill.aoe) {
     const mIdx = state.currentMonsters.findIndex(m => m.id === action.targetId && m.hp > 0);
     if (mIdx !== -1) {
       state.currentMonsters[mIdx] = addMonsterEffect(state.currentMonsters[mIdx], { type: 'slowed', turnsLeft: 3 });
-      log(state, `❄️ ${state.currentMonsters[mIdx].name} lento por 3 turnos!`, 'system');
     }
   }
   if (eff === 'slow' && skill.aoe) {
@@ -781,7 +795,33 @@ function processTransformSkill(
       if (m.hp <= 0) return m;
       return addMonsterEffect(m, { type: 'slowed', turnsLeft: 3 });
     });
-    log(state, `❄️ Todos os inimigos lentos por 3 turnos!`, 'system');
+    log(state, `❄️ Todos os inimigos lentos!`, 'system');
+  }
+  // Bastião / Guardian ult
+  if (eff === 'ult' && p.classType === 'guardian') {
+    Object.keys(state.players).forEach(pid => {
+      const tp = state.players[pid];
+      if (!tp.isAlive) return;
+      state.players[pid] = { ...tp, buffs: { ...tp.buffs, wallTurnsLeft: 4 } };
+    });
+    log(state, `🗿 BASTIÃO DO DEUS! Grupo invulnerável por 4 turnos!`, 'level_up');
+  }
+  // Bard ult
+  if (eff === 'ult' && p.classType === 'bard') {
+    Object.keys(state.players).forEach(pid => {
+      const tp = state.players[pid];
+      if (!tp.isAlive) return;
+      const h = Math.min(tp.maxHp - tp.hp, 80);
+      state.players[pid] = { ...tp, hp: tp.hp + h, buffs: { ...tp.buffs, tempAtkBonus: tp.buffs.tempAtkBonus + 20, tempDefBonus: tp.buffs.tempDefBonus + 20, tempBonusTurns: Math.max(tp.buffs.tempBonusTurns, 5), regenHpPerTurn: tp.buffs.regenHpPerTurn + 30, regenTurnsLeft: Math.max(tp.buffs.regenTurnsLeft, 4) } };
+      log(state, `🎼 ${tp.name}: +20ATK +20DEF +${h}HP`, 'player_action');
+    });
+  }
+  // Necromancer ult (self heal)
+  if (eff === 'ult' && p.classType === 'necromancer') {
+    const healAmt = Math.min(p.maxHp - p.hp, skill.heal ?? 60);
+    p.hp = p.hp + healAmt;
+    state.players[playerId] = { ...state.players[playerId], hp: p.hp };
+    if (healAmt > 0) log(state, `🩸 ${p.name} drena vida dos deuses mortos! +${healAmt}HP!`, 'player_action');
   }
 
   state.actionsThisTurn[playerId] = true;
@@ -789,7 +829,7 @@ function processTransformSkill(
   return { ...state };
 }
 
-// ─── Apply regular skill effects (extracted for reuse) ────────────────────────
+// ─── Apply regular skill effects ──────────────────────────────────────────────
 
 function applySkillEffects(
   state: GameState, playerId: string, p: Player,
@@ -1017,7 +1057,6 @@ function processMonsterTurns(state: GameState): void {
   const aliveMonsters = state.currentMonsters.filter(m => m.hp > 0);
   const alivePlayers = () => Object.values(state.players).filter(p => p.isAlive);
 
-  // Enrage check
   state.currentMonsters = state.currentMonsters.map(monster => {
     if (!monster.isBoss || monster.enraged) return monster;
     if (monster.enrageThreshold && monster.hp / monster.maxHp <= monster.enrageThreshold) {
@@ -1028,7 +1067,6 @@ function processMonsterTurns(state: GameState): void {
     return monster;
   });
 
-  // Boss ult check
   state.currentMonsters = state.currentMonsters.map(monster => {
     if (!monster.isBoss || monster.hp <= 0 || !monster.bossUlt) return monster;
     const tl = (monster.ultTurnsLeft ?? 1) - 1;
@@ -1038,7 +1076,6 @@ function processMonsterTurns(state: GameState): void {
     return { ...monster, ultTurnsLeft: tl };
   });
 
-  // Monster regen
   state.currentMonsters = state.currentMonsters.map(monster => {
     if (monster.hp <= 0 || !monster.regenPerTurn) return monster;
     const heal = monster.regenPerTurn;
@@ -1047,7 +1084,6 @@ function processMonsterTurns(state: GameState): void {
     return { ...monster, hp: newHp };
   });
 
-  // Monster attacks
   aliveMonsters.forEach(monsterSnapshot => {
     if (alivePlayers().length === 0) return;
     const mIdx = state.currentMonsters.findIndex(m => m.id === monsterSnapshot.id);
@@ -1110,7 +1146,6 @@ function processMonsterTurns(state: GameState): void {
         if (slowed) damage = Math.max(1, Math.floor(damage * 0.7));
         if (tp.buffs.wallTurnsLeft > 0) damage = Math.max(1, Math.floor(damage * 0.2));
 
-        // Counter-attack
         if (tp.buffs.counterReflect > 0) {
           const reflect = Math.max(1, Math.floor(damage * tp.buffs.counterReflect));
           const bossIdx = state.currentMonsters.findIndex(m => m.id === monster.id);
@@ -1134,7 +1169,6 @@ function processMonsterTurns(state: GameState): void {
     }
   });
 
-  // Poison tick on monsters
   state.currentMonsters = state.currentMonsters.map(monster => {
     if (monster.hp <= 0) return monster;
     let hp = monster.hp;
@@ -1150,7 +1184,6 @@ function processMonsterTurns(state: GameState): void {
     return { ...monster, hp, effects: newEffects };
   });
 
-  // Player buffs tick down
   Object.keys(state.players).forEach(pid => {
     let p = state.players[pid];
     if (!p.isAlive) return;
@@ -1179,11 +1212,9 @@ function processMonsterTurns(state: GameState): void {
     if (b.dodgeTurnsLeft > 0) b.dodgeTurnsLeft--;
     if ((p as any).tauntTurns > 0) (p as any).tauntTurns--;
 
-    // Transform tick
     if (b.transformTurnsLeft > 0) {
       b.transformTurnsLeft--;
       if (b.transformTurnsLeft <= 0) {
-        // Revert transformation stats
         const transform = TRANSFORMS[p.classType];
         const atkBonus = Math.floor(p.attack / transform.atkMultiplier * (transform.atkMultiplier - 1));
         const defBonus = Math.floor(p.defense / transform.defMultiplier * (transform.defMultiplier - 1));
@@ -1203,7 +1234,6 @@ function processMonsterTurns(state: GameState): void {
     state.players[pid] = { ...p, buffs: b };
   });
 
-  // MP regen
   Object.keys(state.players).forEach(pid => {
     const p = state.players[pid];
     if (!p.isAlive) return;
@@ -1280,7 +1310,6 @@ function checkBattleEnd(state: GameState): void {
         if (nm) log(state, `🗺️ ${nm.theme} ${nm.name} desbloqueado!`, 'level_up');
       }
 
-      // Drop transform item if this is map 7 boss
       if (state.currentMap === 7) {
         Object.keys(state.players).forEach(pid => {
           const p = state.players[pid];

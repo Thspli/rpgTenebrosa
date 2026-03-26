@@ -206,6 +206,12 @@ export interface TransformSkill {
   markTurns?: number;
   execute?: boolean;
   ignoreHalfDef?: boolean;
+  // Ult fields (for transform ult skills)
+  ultLevel?: number;
+  ultName?: string;
+  ultLines?: string[];
+  ultColor?: string;
+  ultBg?: string;
 }
 
 export interface MapDefinition {

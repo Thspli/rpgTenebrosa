@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { GameState } from '@/lib/types';
 import { CLASSES } from '@/lib/gameData';
 
@@ -13,6 +13,14 @@ export default function UltCutscene({ ult, onComplete }: UltCutsceneProps) {
   const [phase, setPhase] = useState<'intro' | 'lines' | 'name' | 'flash' | 'done'>('intro');
   const [lineIndex, setLineIndex] = useState(0);
   const [visible, setVisible] = useState(false);
+  const [skipped, setSkipped] = useState(false);
+
+  const skip = useCallback(() => {
+    if (skipped) return;
+    setSkipped(true);
+    setVisible(false);
+    setTimeout(onComplete, 300);
+  }, [skipped, onComplete]);
 
   const isBossUlt = !!(ult as any).isBossUlt;
 
@@ -23,6 +31,7 @@ export default function UltCutscene({ ult, onComplete }: UltCutsceneProps) {
   }, []);
 
   useEffect(() => {
+    if (skipped) return;
     if (phase !== 'lines') return;
     if (lineIndex < ult.ultLines.length - 1) {
       const t = setTimeout(() => setLineIndex(i => i + 1), 1100);
@@ -31,28 +40,31 @@ export default function UltCutscene({ ult, onComplete }: UltCutsceneProps) {
       const t = setTimeout(() => setPhase('name'), 1200);
       return () => clearTimeout(t);
     }
-  }, [phase, lineIndex, ult.ultLines.length]);
+  }, [phase, lineIndex, ult.ultLines.length, skipped]);
 
   useEffect(() => {
+    if (skipped) return;
     if (phase !== 'name') return;
     const t = setTimeout(() => setPhase('flash'), 1400);
     return () => clearTimeout(t);
-  }, [phase]);
+  }, [phase, skipped]);
 
   useEffect(() => {
+    if (skipped) return;
     if (phase !== 'flash') return;
     const t = setTimeout(() => {
       setVisible(false);
       setTimeout(onComplete, 500);
     }, 900);
     return () => clearTimeout(t);
-  }, [phase, onComplete]);
+  }, [phase, onComplete, skipped]);
 
   const cls = !isBossUlt ? CLASSES[ult.classType] : null;
   const bossName = (ult as any).bossName ?? ult.playerName;
 
   return (
     <div
+      onClick={skip}
       style={{
         position: 'fixed',
         inset: 0,
@@ -66,9 +78,26 @@ export default function UltCutscene({ ult, onComplete }: UltCutsceneProps) {
         overflow: 'hidden',
         flexDirection: 'column',
         gap: 0,
+        cursor: 'pointer',
       }}
     >
-      {/* Animated bg rings — red/dark for boss ult */}
+      {/* Skip hint */}
+      <div style={{
+        position: 'absolute',
+        bottom: 28,
+        right: 32,
+        fontFamily: '"Cinzel", serif',
+        fontSize: 13,
+        color: 'rgba(255,255,255,0.45)',
+        letterSpacing: '0.15em',
+        zIndex: 10,
+        pointerEvents: 'none',
+        animation: 'ultPulse 1.5s ease-in-out infinite alternate',
+      }}>
+        CLIQUE PARA PULAR ▶
+      </div>
+
+      {/* Animated bg rings */}
       <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>
         {[1,2,3,4].map(i => (
           <div key={i} style={{
@@ -83,7 +112,6 @@ export default function UltCutscene({ ult, onComplete }: UltCutsceneProps) {
             transition: `all ${0.6 + i * 0.15}s ease`,
           }} />
         ))}
-        {/* Particle sparks */}
         {Array.from({ length: isBossUlt ? 30 : 20 }).map((_, i) => (
           <div key={i} style={{
             position: 'absolute',
@@ -98,7 +126,6 @@ export default function UltCutscene({ ult, onComplete }: UltCutsceneProps) {
             boxShadow: `0 0 ${isBossUlt ? 12 : 8}px ${ult.ultColor}`,
           }} />
         ))}
-        {/* Boss ult: extra crack lines */}
         {isBossUlt && (phase === 'name' || phase === 'flash') && Array.from({ length: 8 }).map((_, i) => (
           <div key={`crack-${i}`} style={{
             position: 'absolute',
@@ -160,7 +187,6 @@ export default function UltCutscene({ ult, onComplete }: UltCutsceneProps) {
         gap: 32, padding: '0 40px', textAlign: 'center',
         position: 'relative', zIndex: 1,
       }}>
-        {/* Big emoji */}
         <div style={{
           fontSize: phase === 'name' || phase === 'flash' ? (isBossUlt ? '140px' : '120px') : (isBossUlt ? '100px' : '80px'),
           filter: `drop-shadow(0 0 ${isBossUlt ? 60 : 40}px ${ult.ultColor}) drop-shadow(0 0 ${isBossUlt ? 100 : 80}px ${ult.ultColor})`,
@@ -171,7 +197,6 @@ export default function UltCutscene({ ult, onComplete }: UltCutsceneProps) {
           {ult.ultEmoji}
         </div>
 
-        {/* Cinematic lines */}
         <div style={{ minHeight: 80, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
           {phase === 'lines' && ult.ultLines.map((line, i) => (
             <div key={i} style={{
@@ -190,7 +215,6 @@ export default function UltCutscene({ ult, onComplete }: UltCutsceneProps) {
           ))}
         </div>
 
-        {/* ULT NAME */}
         {(phase === 'name' || phase === 'flash') && (
           <div style={{
             fontFamily: '"Cinzel", serif',
@@ -210,7 +234,6 @@ export default function UltCutscene({ ult, onComplete }: UltCutsceneProps) {
           </div>
         )}
 
-        {/* Flash overlay */}
         {phase === 'flash' && (
           <div style={{
             position: 'fixed', inset: 0,
@@ -221,7 +244,6 @@ export default function UltCutscene({ ult, onComplete }: UltCutsceneProps) {
         )}
       </div>
 
-      {/* Bottom bar */}
       <div style={{
         position: 'absolute', bottom: 0, left: 0, right: 0, height: isBossUlt ? 5 : 3,
         background: `linear-gradient(to right, transparent, ${ult.ultColor}, transparent)`,
@@ -229,7 +251,6 @@ export default function UltCutscene({ ult, onComplete }: UltCutsceneProps) {
         transition: 'opacity 0.5s ease',
       }} />
 
-      {/* Scan lines */}
       <div style={{
         position: 'absolute', inset: 0, pointerEvents: 'none',
         backgroundImage: 'repeating-linear-gradient(0deg, rgba(0,0,0,0.03) 0px, rgba(0,0,0,0.03) 1px, transparent 1px, transparent 2px)',
