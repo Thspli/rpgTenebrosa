@@ -27,7 +27,7 @@ export default function ClassSelection({ gameState, myId, onSelectClass, onReady
     <div className={styles.container}>
       <div className={styles.header}>
         <h2 className={styles.title}>⚔ Escolha sua Classe</h2>
-        <p className={styles.subtitle}>12 classes disponíveis — cada classe só pode ser escolhida por um jogador</p>
+        <p className={styles.subtitle}>15 classes disponíveis — cada classe só pode ser escolhida por um jogador</p>
       </div>
 
       <div className={styles.grid}>

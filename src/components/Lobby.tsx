@@ -74,8 +74,8 @@ export default function Lobby({ gameState, myId, onJoin }: Props) {
           <h3 className={styles.infoTitle}>📜 Como Jogar</h3>
           <ul className={styles.infoList}>
             <li>1-6 jogadores se unem e escolhem suas classes</li>
-            <li>6 classes disponíveis desde o início: Guerreiro, Mago, Ladino, Necromante, Paladino e Arqueiro</li>
-            <li>Explore 7 mapas com dificuldade crescente</li>
+            <li>15 classes disponíveis — cada classe só pode ser escolhida por um jogador</li>
+            <li>Explore 10 mapas com dificuldade crescente</li>
             <li>Combate em turnos: cada jogador age um por vez</li>
             <li>A loja abre a cada 3 turnos — todos devem clicar em Pronto para continuar</li>
             <li>⚠️ Progresso é perdido se o servidor reiniciar</li>
