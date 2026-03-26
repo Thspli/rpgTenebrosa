@@ -518,7 +518,7 @@ export function processPlayerAction(
     }
 
     if (skill.heal !== undefined) {
-      if (skill.effect === 'aoe_heal' || skill.effect === 'ult') {
+      if ((skill.effect === 'aoe_heal' || skill.effect === 'ult') && !skill.selfOnly) {
         Object.keys(state.players).forEach(pid => {
           const tp = state.players[pid];
           if (skill.effect === 'ult' && !tp.isAlive) {
@@ -533,6 +533,10 @@ export function processPlayerAction(
           if (h > 0) log(state, `💚 ${tp.name} recupera ${h} HP!`, 'player_action');
         });
         log(state, `${p.name} usa ${skill.emoji} ${skill.name}! Cura ${skill.heal}HP para todos.`, 'player_action');
+      } else if (skill.selfOnly || (skill.effect === 'ult' && skill.selfOnly)) {
+        const h = Math.min(p.maxHp - p.hp, skill.heal);
+        p.hp = Math.min(p.maxHp, p.hp + skill.heal);
+        if (h > 0) log(state, `💚 ${p.name} usa ${skill.emoji} ${skill.name}! +${h} HP.`, 'player_action');
       } else if (action.targetId && state.players[action.targetId]) {
         const tp = state.players[action.targetId];
         const h = Math.min(tp.maxHp - tp.hp, skill.heal);
@@ -541,7 +545,7 @@ export function processPlayerAction(
       } else {
         const h = Math.min(p.maxHp - p.hp, skill.heal);
         p.hp = Math.min(p.maxHp, p.hp + skill.heal);
-        log(state, `${p.name} usa ${skill.emoji} ${skill.name}! +${h} HP.`, 'player_action');
+        if (h > 0) log(state, `💚 ${p.name} usa ${skill.emoji} ${skill.name}! +${h} HP.`, 'player_action');
       }
     }
 
@@ -797,12 +801,12 @@ function processTransformSkill(
     });
     log(state, `❄️ Todos os inimigos lentos!`, 'system');
   }
-  // Bastião / Guardian ult
+  // Bastião / Guardian ult (Transform)
   if (eff === 'ult' && p.classType === 'guardian') {
     Object.keys(state.players).forEach(pid => {
       const tp = state.players[pid];
       if (!tp.isAlive) return;
-      state.players[pid] = { ...tp, buffs: { ...tp.buffs, wallTurnsLeft: 4 } };
+      state.players[pid] = { ...tp, buffs: { ...tp.buffs, guardianUltTurnsLeft: 4 } };
     });
     log(state, `🗿 BASTIÃO DO DEUS! Grupo invulnerável por 4 turnos!`, 'level_up');
   }
@@ -841,7 +845,7 @@ function applySkillEffects(
     Object.keys(state.players).forEach(pid => {
       const tp = state.players[pid];
       if (!tp.isAlive) return;
-      state.players[pid] = { ...tp, buffs: { ...tp.buffs, wallTurnsLeft: 3 } };
+      state.players[pid] = { ...tp, buffs: { ...tp.buffs, guardianUltTurnsLeft: 3 } };
     });
     log(state, `🗿 BASTIÃO ETERNO! Grupo invulnerável por 3 turnos!`, 'level_up');
   }
@@ -1013,8 +1017,12 @@ function executeBossUlt(state: GameState, monster: Monster, ult: BossUlt): Monst
     Object.keys(state.players).forEach(pid => {
       const p = state.players[pid];
       if (!p.isAlive) return;
+      if (p.buffs.guardianUltTurnsLeft > 0) {
+        log(state, `🛡️ ${p.name} está invulnerável!`, 'monster_action');
+        return;
+      }
       let dmg = ult.aoeDamage!;
-      if (p.buffs.wallTurnsLeft > 0) dmg = Math.max(1, Math.floor(dmg * 0.4));
+      if (p.buffs.wallTurnsLeft > 0) dmg = Math.max(1, Math.floor(dmg * 0.5));
       state.players[pid] = { ...p, hp: Math.max(0, p.hp - dmg) };
       log(state, `💥 ${ult.emoji} ${ult.name} atinge ${p.name}! ${dmg} dano!`, 'monster_action');
       if (state.players[pid].hp <= 0) {
@@ -1112,6 +1120,10 @@ function processMonsterTurns(state: GameState): void {
             log(state, `💨 ${p.name} ESQUIVA!`, 'monster_action');
             return;
           }
+          if (p.buffs.guardianUltTurnsLeft > 0) {
+            log(state, `🛡️ ${p.name} está invulnerável!`, 'monster_action');
+            return;
+          }
           const dice = rollDice();
           const effectiveDef = Math.floor(getEffectiveDef(p) * (1 - piercePct));
           const cursedAtk = monster.effects?.find(e => e.type === 'cursed');
@@ -1134,6 +1146,11 @@ function processMonsterTurns(state: GameState): void {
 
         if (tp.buffs.dodgeTurnsLeft > 0) {
           log(state, `💨 ${target.name} ESQUIVA de ${monster.emoji}${monster.name}!`, 'monster_action');
+          continue;
+        }
+
+        if (tp.buffs.guardianUltTurnsLeft > 0) {
+          log(state, `🛡️ ${target.name} está invulnerável!`, 'monster_action');
           continue;
         }
 
@@ -1209,6 +1226,10 @@ function processMonsterTurns(state: GameState): void {
       b.wallTurnsLeft--;
       if (b.wallTurnsLeft <= 0) log(state, `🏰 Muralha do grupo desmoronou!`, 'system');
     }
+    if (b.guardianUltTurnsLeft > 0) {
+      b.guardianUltTurnsLeft--;
+      if (b.guardianUltTurnsLeft <= 0) log(state, `✨ ${p.name} deixa de estar invulnerável!`, 'system');
+    }
     if (b.dodgeTurnsLeft > 0) b.dodgeTurnsLeft--;
     if ((p as any).tauntTurns > 0) (p as any).tauntTurns--;
 
@@ -1216,12 +1237,10 @@ function processMonsterTurns(state: GameState): void {
       b.transformTurnsLeft--;
       if (b.transformTurnsLeft <= 0) {
         const transform = TRANSFORMS[p.classType];
-        const atkBonus = Math.floor(p.attack / transform.atkMultiplier * (transform.atkMultiplier - 1));
-        const defBonus = Math.floor(p.defense / transform.defMultiplier * (transform.defMultiplier - 1));
         p = {
           ...p,
-          attack: Math.max(p.baseAttack, p.attack - atkBonus),
-          defense: Math.max(p.baseDefense, p.defense - defBonus),
+          attack: p.baseAttack,
+          defense: p.baseDefense,
           maxHp: p.maxHp - transform.hpBonusFlat,
           hp: Math.max(1, p.hp - transform.hpBonusFlat),
         };

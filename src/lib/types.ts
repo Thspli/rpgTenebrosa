@@ -59,6 +59,8 @@ export interface PlayerBuffs {
   // Transformation
   transformTurnsLeft: number;
   transformUsedThisCombat: boolean;
+  // Guardian Ultimate - Complete Invulnerability
+  guardianUltTurnsLeft: number;
 }
 
 export const DEFAULT_BUFFS: PlayerBuffs = {
@@ -72,6 +74,7 @@ export const DEFAULT_BUFFS: PlayerBuffs = {
   berserkTurnsLeft: 0,
   transformTurnsLeft: 0,
   transformUsedThisCombat: false,
+  guardianUltTurnsLeft: 0,
 };
 
 export interface Player {
