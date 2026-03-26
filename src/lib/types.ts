@@ -72,6 +72,10 @@ export interface PlayerBuffs {
   spiritStacks: number;
   // Trickster clone active
   cloneTurnsLeft: number;
+  // Trickster position swap (guard ally)
+  guardingPlayerId?: string;
+  guardTurnsLeft: number;
+  guardReductionPct: number;
 }
 
 export const DEFAULT_BUFFS: PlayerBuffs = {
@@ -90,6 +94,8 @@ export const DEFAULT_BUFFS: PlayerBuffs = {
   summonCount: 0,
   spiritStacks: 0,
   cloneTurnsLeft: 0,
+  guardTurnsLeft: 0,
+  guardReductionPct: 0,
 };
 
 export interface Player {
