@@ -1,11 +1,16 @@
 'use client';
 
+// ═══════════════════════════════════════════════════════════
+//  src/components/UltCutscene.tsx
+//  Migrado: usa @/engine/types e @/engine/data
+// ═══════════════════════════════════════════════════════════
+
 import { useEffect, useState, useCallback } from 'react';
-import { GameState } from '@/lib/types';
-import { CLASSES } from '@/lib/gameData';
+import type { UltCutsceneData } from '@/engine/types';
+import { CLASSES } from '@/engine/data';
 
 interface UltCutsceneProps {
-  ult: NonNullable<GameState['activeUlt']>;
+  ult: UltCutsceneData;
   onComplete: () => void;
 }
 
@@ -43,7 +48,6 @@ export default function UltCutscene({ ult, onComplete }: UltCutsceneProps) {
     }
   }, [phase, lineIndex, ult.ultLines.length, skipped]);
 
-  // Glitch effect when name appears
   useEffect(() => {
     if (phase === 'name') {
       setGlitchActive(true);
@@ -72,7 +76,6 @@ export default function UltCutscene({ ult, onComplete }: UltCutsceneProps) {
   const cls = !isBossUlt ? CLASSES[ult.classType] : null;
   const bossName = (ult as any).bossName ?? ult.playerName;
 
-  // Generate pixel particles
   const particles = Array.from({ length: isBossUlt ? 24 : 16 });
 
   return (
@@ -96,58 +99,42 @@ export default function UltCutscene({ ult, onComplete }: UltCutsceneProps) {
         fontFamily: "'Press Start 2P', monospace",
       }}
     >
-      {/* Pixel scanlines overlay */}
+      {/* Pixel scanlines */}
       <div style={{
-        position: 'absolute',
-        inset: 0,
+        position: 'absolute', inset: 0,
         background: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.12) 2px, rgba(0,0,0,0.12) 4px)',
-        pointerEvents: 'none',
-        zIndex: 2,
+        pointerEvents: 'none', zIndex: 2,
       }} />
 
       {/* Pixel grid */}
       <div style={{
-        position: 'absolute',
-        inset: 0,
+        position: 'absolute', inset: 0,
         backgroundImage: `linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px)`,
         backgroundSize: '32px 32px',
-        pointerEvents: 'none',
-        zIndex: 1,
+        pointerEvents: 'none', zIndex: 1,
       }} />
 
-      {/* Pixel particles */}
+      {/* Particles */}
       <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: 3 }}>
         {particles.map((_, i) => {
           const size = 4 + (i % 3) * 4;
           const x = 5 + (i * 37) % 90;
           const y = 5 + (i * 53) % 90;
           return (
-            <div
-              key={i}
-              style={{
-                position: 'absolute',
-                top: `${y}%`,
-                left: `${x}%`,
-                width: size,
-                height: size,
-                background: ult.ultColor,
-                opacity: (phase === 'lines' || phase === 'name') ? 0.6 + (i % 4) * 0.1 : 0,
-                transition: `opacity ${0.2 + (i % 3) * 0.15}s steps(2, end)`,
-                imageRendering: 'pixelated',
-              }}
-            />
+            <div key={i} style={{
+              position: 'absolute', top: `${y}%`, left: `${x}%`,
+              width: size, height: size, background: ult.ultColor,
+              opacity: (phase === 'lines' || phase === 'name') ? 0.6 + (i % 4) * 0.1 : 0,
+              transition: `opacity ${0.2 + (i % 3) * 0.15}s steps(2, end)`,
+              imageRendering: 'pixelated',
+            }} />
           );
         })}
-
-        {/* Pixel border rings */}
-        {[1,2,3].map(i => (
+        {[1, 2, 3].map(i => (
           <div key={`ring-${i}`} style={{
-            position: 'absolute',
-            top: '50%', left: '50%',
-            width: i * 160,
-            height: i * 160,
-            marginLeft: -i * 80,
-            marginTop: -i * 80,
+            position: 'absolute', top: '50%', left: '50%',
+            width: i * 160, height: i * 160,
+            marginLeft: -i * 80, marginTop: -i * 80,
             border: `4px solid ${ult.ultColor}`,
             opacity: phase === 'name' || phase === 'flash' ? (isBossUlt ? 0.5 : 0.3) : 0,
             transform: phase === 'flash' ? `scale(${1.5 + i * 0.3})` : 'scale(1)',
@@ -159,21 +146,16 @@ export default function UltCutscene({ ult, onComplete }: UltCutsceneProps) {
 
       {/* Skip hint */}
       <div style={{
-        position: 'absolute',
-        bottom: 24,
-        right: 28,
-        fontFamily: "'Press Start 2P', monospace",
-        fontSize: 8,
-        color: 'rgba(255,255,255,0.3)',
-        letterSpacing: '0.08em',
-        zIndex: 10,
-        pointerEvents: 'none',
+        position: 'absolute', bottom: 24, right: 28,
+        fontFamily: "'Press Start 2P', monospace", fontSize: 8,
+        color: 'rgba(255,255,255,0.3)', letterSpacing: '0.08em',
+        zIndex: 10, pointerEvents: 'none',
         animation: 'pixelBlink 1.2s step-end infinite',
       }}>
         [CLICK] SKIP ▶
       </div>
 
-      {/* Top bar — pixel dialog style */}
+      {/* Top bar */}
       <div style={{
         position: 'absolute', top: 0, left: 0, right: 0,
         padding: '14px 24px',
@@ -211,13 +193,8 @@ export default function UltCutscene({ ult, onComplete }: UltCutsceneProps) {
           )}
         </div>
         <div style={{
-          marginLeft: 'auto',
-          fontFamily: "'Press Start 2P', monospace",
-          fontSize: 8,
-          color: ult.ultColor,
-          letterSpacing: '0.12em',
-          opacity: 0.7,
-          textShadow: '1px 1px 0 rgba(0,0,0,0.8)',
+          marginLeft: 'auto', fontFamily: "'Press Start 2P', monospace",
+          fontSize: 8, color: ult.ultColor, letterSpacing: '0.12em', opacity: 0.7,
         }}>
           {isBossUlt ? '[ DANGER ]' : '[ LIMIT BREAK ]'}
         </div>
@@ -225,21 +202,12 @@ export default function UltCutscene({ ult, onComplete }: UltCutsceneProps) {
 
       {/* Center content */}
       <div style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: 28,
-        padding: '0 40px',
-        textAlign: 'center',
-        position: 'relative',
-        zIndex: 4,
-        marginTop: 40,
+        display: 'flex', flexDirection: 'column', alignItems: 'center',
+        gap: 28, padding: '0 40px', textAlign: 'center',
+        position: 'relative', zIndex: 4, marginTop: 40,
       }}>
-        {/* Main emoji */}
         <div style={{
-          fontSize: phase === 'name' || phase === 'flash'
-            ? (isBossUlt ? 110 : 96)
-            : (isBossUlt ? 80 : 68),
+          fontSize: phase === 'name' || phase === 'flash' ? (isBossUlt ? 110 : 96) : (isBossUlt ? 80 : 68),
           filter: `drop-shadow(4px 4px 0 ${ult.ultColor}88) drop-shadow(0 0 ${isBossUlt ? 40 : 30}px ${ult.ultColor})`,
           transition: 'all 0.4s steps(4, end)',
           opacity: phase === 'intro' ? 0 : 1,
@@ -250,14 +218,7 @@ export default function UltCutscene({ ult, onComplete }: UltCutsceneProps) {
           {ult.ultEmoji}
         </div>
 
-        {/* Dialog lines — pixel style */}
-        <div style={{
-          minHeight: 90,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: 10,
-        }}>
+        <div style={{ minHeight: 90, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
           {phase === 'lines' && ult.ultLines.map((line, i) => (
             <div key={i} style={{
               fontFamily: "'Press Start 2P', monospace",
@@ -277,7 +238,6 @@ export default function UltCutscene({ ult, onComplete }: UltCutsceneProps) {
           ))}
         </div>
 
-        {/* ULT name — big pixel impact */}
         {(phase === 'name' || phase === 'flash') && (
           <div style={{
             fontFamily: "'Press Start 2P', monospace",
@@ -286,12 +246,11 @@ export default function UltCutscene({ ult, onComplete }: UltCutsceneProps) {
             color: ult.ultColor,
             letterSpacing: '0.1em',
             textTransform: 'uppercase',
-            textShadow: `4px 4px 0 ${ult.ultColor.replace(')', ', 0.5)').replace('rgb', 'rgba').replace('#', '').slice(0, -1) || '000000'}, 3px 3px 0 rgba(0,0,0,0.8), 0 0 30px ${ult.ultColor}`,
+            textShadow: `4px 4px 0 rgba(0,0,0,0.8), 0 0 30px ${ult.ultColor}`,
             animation: phase === 'flash' ? 'none' : 'ultPixelPulse 0.4s steps(3, end) infinite alternate',
             opacity: phase === 'flash' ? 0 : 1,
             transition: 'opacity 0.3s steps(3, end)',
             lineHeight: 1.2,
-            filter: glitchActive ? `hue-rotate(${Math.random() * 180}deg)` : 'none',
           }}>
             {isBossUlt && (
               <div style={{ fontSize: '55%', marginBottom: 6, color: '#ff4444', textShadow: '2px 2px 0 #660000' }}>⚠ WARNING ⚠</div>
@@ -300,15 +259,12 @@ export default function UltCutscene({ ult, onComplete }: UltCutsceneProps) {
           </div>
         )}
 
-        {/* Flash screen */}
         {phase === 'flash' && (
           <div style={{
-            position: 'fixed',
-            inset: 0,
+            position: 'fixed', inset: 0,
             background: ult.ultColor,
             animation: 'pixelFlash 0.6s steps(4, end) forwards',
-            pointerEvents: 'none',
-            zIndex: 8,
+            pointerEvents: 'none', zIndex: 8,
           }} />
         )}
       </div>
@@ -324,26 +280,15 @@ export default function UltCutscene({ ult, onComplete }: UltCutsceneProps) {
       }} />
 
       <style>{`
-        @keyframes pixelBlink {
-          0%, 49% { opacity: 1; }
-          50%, 100% { opacity: 0; }
-        }
-        @keyframes pixelFlash {
-          0%   { opacity: 0; }
-          20%  { opacity: 0.9; }
-          50%  { opacity: 0.6; }
-          100% { opacity: 0; }
-        }
-        @keyframes ultPixelPulse {
-          from { letter-spacing: 0.08em; }
-          to   { letter-spacing: 0.14em; }
-        }
+        @keyframes pixelBlink { 0%,49%{opacity:1} 50%,100%{opacity:0} }
+        @keyframes pixelFlash { 0%{opacity:0} 20%{opacity:0.9} 50%{opacity:0.6} 100%{opacity:0} }
+        @keyframes ultPixelPulse { from{letter-spacing:0.08em} to{letter-spacing:0.14em} }
         @keyframes pixelGlitch {
-          0%   { transform: scale(1) translate(0,0); filter: hue-rotate(0deg); }
-          25%  { transform: scale(1.05) translate(-4px,2px); filter: hue-rotate(90deg) saturate(2); }
-          50%  { transform: scale(0.98) translate(4px,-2px); filter: hue-rotate(-90deg) saturate(2); }
-          75%  { transform: scale(1.02) translate(-2px,-2px); filter: hue-rotate(45deg); }
-          100% { transform: scale(1) translate(0,0); filter: hue-rotate(0deg); }
+          0%  {transform:scale(1) translate(0,0);filter:hue-rotate(0deg)}
+          25% {transform:scale(1.05) translate(-4px,2px);filter:hue-rotate(90deg) saturate(2)}
+          50% {transform:scale(0.98) translate(4px,-2px);filter:hue-rotate(-90deg) saturate(2)}
+          75% {transform:scale(1.02) translate(-2px,-2px);filter:hue-rotate(45deg)}
+          100%{transform:scale(1) translate(0,0);filter:hue-rotate(0deg)}
         }
       `}</style>
     </div>

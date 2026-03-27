@@ -1,7 +1,11 @@
 'use client';
 
+// ═══════════════════════════════════════════════════════════
+//  src/app/page.tsx
+// ═══════════════════════════════════════════════════════════
+
 import { useSocket } from '@/hooks/useSocket';
-import { ClassType, MapId } from '@/lib/types';
+import type { ClassType, MapId } from '@/engine/types';
 import Lobby from '@/components/Lobby';
 import ClassSelection from '@/components/ClassSelection';
 import MapAndShop from '@/components/MapAndShop';

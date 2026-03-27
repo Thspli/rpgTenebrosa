@@ -1,7 +1,12 @@
 'use client';
 
-import { GameState, MapId } from '@/lib/types';
-import { MAPS, SHOP_ITEMS, CLASSES } from '@/lib/gameData';
+// ═══════════════════════════════════════════════════════════
+//  src/components/MapAndShop.tsx
+//  Migrado: usa @/engine/types e @/engine/data
+// ═══════════════════════════════════════════════════════════
+
+import type { GameState, MapId } from '@/engine/types';
+import { MAPS, SHOP_ITEMS, CLASSES } from '@/engine/data';
 import styles from './MapAndShop.module.css';
 
 interface Props {
@@ -18,7 +23,6 @@ export default function MapAndShop({ gameState, myId, onSelectMap, onBuyItem, on
   const phase = gameState.phase;
   const isMidCombatShop = phase === 'shopping' && gameState.turn > 0;
   const isVictoryShop = phase === 'victory_shopping';
-  const isShopPhase = isMidCombatShop || isVictoryShop;
   const currentMap = MAPS.find(m => m.id === gameState.currentMap);
   const nextMapId = (gameState.currentMap + 1) as MapId;
   const nextMap = MAPS.find(m => m.id === nextMapId);

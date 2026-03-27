@@ -1,8 +1,13 @@
 'use client';
 
+// ═══════════════════════════════════════════════════════════
+//  src/hooks/useSocket.ts
+//  Importa GameState direto do engine.
+// ═══════════════════════════════════════════════════════════
+
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
-import { GameState } from '@/lib/types';
+import type { GameState } from '@/engine/types';
 
 let socket: Socket | null = null;
 
@@ -16,7 +21,6 @@ export function useSocket() {
     if (initialized.current) return;
     initialized.current = true;
 
-    // Initialize socket connection
     fetch('/api/socket').finally(() => {
       socket = io(window.location.origin, {
         path: '/api/socket',

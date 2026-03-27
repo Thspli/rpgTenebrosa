@@ -1,7 +1,13 @@
 'use client';
 
-import { GameState, ClassType } from '@/lib/types';
-import { CLASSES, SKILLS } from '@/lib/gameData';
+// ═══════════════════════════════════════════════════════════
+//  src/components/ClassSelection.tsx
+//  Migrado: usa @/engine/types e @/engine/data
+// ═══════════════════════════════════════════════════════════
+
+import type { GameState, ClassType } from '@/engine/types';
+import { CLASSES } from '@/engine/data';
+import { CLASS_SKILLS } from '@/engine/skills';
 import styles from './ClassSelection.module.css';
 
 interface Props {
@@ -16,7 +22,6 @@ export default function ClassSelection({ gameState, myId, onSelectClass, onReady
   const selectedClass = myPlayer?.classType;
   const isReady = myPlayer?.isReady;
 
-  // Classes already picked by OTHER players
   const takenClasses = new Set(
     Object.values(gameState.players)
       .filter(p => p.id !== myId && p.classType)
@@ -34,7 +39,8 @@ export default function ClassSelection({ gameState, myId, onSelectClass, onReady
         {(Object.entries(CLASSES) as [ClassType, typeof CLASSES[ClassType]][]).map(([key, cls]) => {
           const isSelected = selectedClass === key;
           const isTaken = takenClasses.has(key) && !isSelected;
-          const skills = SKILLS[key];
+          // CLASS_SKILLS[key] retorna Skill[] do engine — compatível com .name, .emoji, .mpCost
+          const skills = CLASS_SKILLS[key] ?? [];
 
           return (
             <div

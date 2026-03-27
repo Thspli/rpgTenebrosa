@@ -1,13 +1,22 @@
 'use client';
 
+// ═══════════════════════════════════════════════════════════
+//  src/components/Combat.tsx
+//  Migrado: usa @/engine/types, @/engine/data, @/engine/skills
+//  Buffs lidos via getPlayerBuffs() de @/lib/index
+// ═══════════════════════════════════════════════════════════
+
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { GameState, Monster, MonsterEffect } from '@/lib/types';
-import { CLASSES, SKILLS, MAPS } from '@/lib/gameData';
-import { TRANSFORMS } from '@/lib/transformData';
+import type { GameState, Monster, Player } from '@/engine/types';
+import { CLASSES, MAPS } from '@/engine/data';
+import { CLASS_SKILLS } from '@/engine/skills';
+import { getPlayerBuffs } from '@/lib/index';
 import styles from './Combat.module.css';
 import UltCutscene from './UltCutscene';
 import ActionFeed from './ActionFeed';
 import { FloatingDamageNumbers, StatusBanners } from './CombatAnimations';
+
+import { TRANSFORMS } from '@/engine/transformData';
 
 interface Props {
   gameState: GameState;
@@ -25,29 +34,42 @@ export default function Combat({ gameState, myId, onAction, onReset, onClearUlt,
   const [selectedSkillIdx, setSelectedSkillIdx] = useState<number | null>(null);
   const [targetMode, setTargetMode] = useState<TargetMode>('enemy');
   const [showingUlt, setShowingUlt] = useState(false);
-  // Track flash states for monster cards
   const [flashMap, setFlashMap] = useState<Record<string, 'hit' | 'heal' | null>>({});
   const logScrollRef = useRef<HTMLDivElement>(null);
   const prevLogLen = useRef(0);
 
   const myPlayer   = gameState.players[myId];
+  // engine usa .monsters (não .currentMonsters)
+  const monsters   = gameState.monsters ?? [];
   const mapDef     = MAPS.find(m => m.id === gameState.currentMap);
   const isMyTurn   = gameState.activePlayerId === myId;
   const canAct     = !!(myPlayer?.isAlive && isMyTurn && gameState.phase === 'combat');
-  const aliveM     = gameState.currentMonsters.filter(m => m.hp > 0 && !m.isSummon);
-  const enemyMonsters = gameState.currentMonsters.filter(m => !m.isSummon);
-  const alliedSummons = gameState.currentMonsters.filter(m => m.isSummon && m.hp > 0);
+  const aliveM     = monsters.filter(m => m.hp > 0 && !m.isSummon);
+  const enemyMonsters  = monsters.filter(m => !m.isSummon);
+  const alliedSummons  = monsters.filter(m => m.isSummon && m.hp > 0);
   const activePl   = gameState.activePlayerId ? gameState.players[gameState.activePlayerId] : null;
+
+  // Buffs via helper de compatibilidade
+  const myBuffs = myPlayer ? getPlayerBuffs(myPlayer) : null;
+
   const myPotions  = myPlayer?.inventory.filter(i => i.consumable && (i.quantity ?? 0) > 0) ?? [];
-  const isTransformed = (myPlayer?.buffs.transformTurnsLeft ?? 0) > 0;
-  const transform  = myPlayer ? TRANSFORMS[myPlayer.classType] : null;
+  const isTransformed  = (myBuffs?.transformTurnsLeft ?? 0) > 0;
+  const transform      = myPlayer ? TRANSFORMS[myPlayer.classType] : null;
   const hasTransformItem = myPlayer?.inventory.some(i => i.isTransformItem) ?? false;
-  const canTransform = hasTransformItem && !myPlayer?.buffs.transformUsedThisCombat && !isTransformed;
-  const currentSkills = isTransformed && transform ? transform.skillOverrides : (myPlayer ? SKILLS[myPlayer.classType] : []);
-  const selectedSkill = selectedSkillIdx !== null ? currentSkills[selectedSkillIdx] : null;
-  const needsAllyTarget  = !!(selectedSkill?.targetAlly);
-  const needsEnemyTarget = !!(selectedSkill && !('selfOnly' in selectedSkill && selectedSkill.selfOnly) && !selectedSkill.aoe &&
-    (selectedSkill.damage !== undefined || ['poison','stun','curse','mark','slow'].includes(selectedSkill.effect ?? '')));
+  const canTransform   = hasTransformItem && !myBuffs?.transformUsedThisCombat && !isTransformed;
+  const currentSkills  = isTransformed && transform
+    ? transform.skillOverrides
+    : (myPlayer ? CLASS_SKILLS[myPlayer.classType] ?? [] : []);
+  const selectedSkill  = selectedSkillIdx !== null ? currentSkills[selectedSkillIdx] : null;
+
+  // No engine novo, skills têm .target ao invés de .targetAlly
+  const needsAllyTarget  = !!(selectedSkill && ('target' in selectedSkill
+    ? selectedSkill.target === 'ally' || selectedSkill.target === 'ally_aoe'
+    : (selectedSkill as any).targetAlly));
+  const needsEnemyTarget = !!(selectedSkill && !needsAllyTarget &&
+    ('target' in selectedSkill
+      ? selectedSkill.target === 'enemy'
+      : !!(selectedSkill as any).damage));
 
   // Auto-scroll log
   useEffect(() => {
@@ -56,7 +78,7 @@ export default function Combat({ gameState, myId, onAction, onReset, onClearUlt,
     }
   }, [gameState.combatLog.length]);
 
-  // Monster hit flash detection
+  // Flash ao acertar monstros
   useEffect(() => {
     if (gameState.combatLog.length <= prevLogLen.current) return;
     const newEntries = gameState.combatLog.slice(prevLogLen.current);
@@ -64,13 +86,9 @@ export default function Combat({ gameState, myId, onAction, onReset, onClearUlt,
 
     const newFlashes: Record<string, 'hit' | 'heal'> = {};
     for (const entry of newEntries) {
-      // Detect damage on monsters by parsing log messages
       if ((entry.type === 'player_action' || entry.type === 'system') && entry.message.match(/Dano:|dano/i)) {
-        // Find which monster by emoji/name in message
-        for (const m of gameState.currentMonsters) {
-          if (entry.message.includes(m.name)) {
-            newFlashes[m.id] = 'hit';
-          }
+        for (const m of monsters) {
+          if (entry.message.includes(m.name)) newFlashes[m.id] = 'hit';
         }
       }
     }
@@ -99,7 +117,9 @@ export default function Combat({ gameState, myId, onAction, onReset, onClearUlt,
   function pickSkill(i: number) {
     if (selectedSkillIdx === i) { setSelectedSkillIdx(null); setSelectedTarget(null); return; }
     const sk = currentSkills[i];
-    const ally = !!(sk.targetAlly);
+    const ally = 'target' in sk
+      ? sk.target === 'ally' || sk.target === 'ally_aoe'
+      : !!(sk as any).targetAlly;
     setSelectedSkillIdx(i);
     setSelectedTarget(null);
     setTargetMode(ally ? 'ally' : 'enemy');
@@ -145,14 +165,11 @@ export default function Combat({ gameState, myId, onAction, onReset, onClearUlt,
 
   return (
     <div className={styles.layout}>
-      {/* ── Floating damage numbers + status banners ── */}
       <FloatingDamageNumbers log={gameState.combatLog} />
       <StatusBanners log={gameState.combatLog} />
-
-      {/* ── Action feed (right) ── */}
       <ActionFeed log={gameState.combatLog} />
 
-      {/* ── HEADER ── */}
+      {/* HEADER */}
       <div className={styles.header}>
         <div className={styles.headerLeft}>
           <span className={styles.mapBadge}>{mapDef?.theme} {mapDef?.name}</span>
@@ -170,7 +187,7 @@ export default function Combat({ gameState, myId, onAction, onReset, onClearUlt,
         </div>
       </div>
 
-      {/* ── MAIN AREA ── */}
+      {/* MAIN AREA */}
       <div className={styles.mainArea}>
 
         {/* BATTLEFIELD */}
@@ -200,17 +217,16 @@ export default function Combat({ gameState, myId, onAction, onReset, onClearUlt,
             ))}
           </div>
 
-          {/* Allied Summons */}
           {alliedSummons.length > 0 && (
             <>
               <div className={styles.sectionLabel}>Aliados Invocados</div>
               <div className={styles.summonsSection}>
                 {alliedSummons.map(s => {
                   const color = s.isNecroShadow ? '#8e44ad' : '#a0522d';
-                  const bg = s.isNecroShadow ? 'rgba(142,68,173,0.08)' : 'rgba(160,82,45,0.08)';
-                  const border = s.isNecroShadow ? 'rgba(142,68,173,0.4)' : 'rgba(160,82,45,0.35)';
-                  const role = (s as any).animalRole ?? (s.isNecroShadow ? 'sombra' : 'aliado');
-                  const roleEmoji: Record<string, string> = { damage: '⚔️', tank: '🛡️', healer: '💚', buffer: '✨', debuffer: '☠️', sombra: '👻', aliado: '🤝' };
+                  const bg    = s.isNecroShadow ? 'rgba(142,68,173,0.08)' : 'rgba(160,82,45,0.08)';
+                  const border= s.isNecroShadow ? 'rgba(142,68,173,0.4)' : 'rgba(160,82,45,0.35)';
+                  const role  = (s as any).animalRole ?? (s.isNecroShadow ? 'sombra' : 'aliado');
+                  const roleEmoji: Record<string, string> = { damage:'⚔️', tank:'🛡️', healer:'💚', buffer:'✨', debuffer:'☠️', sombra:'👻', aliado:'🤝' };
                   return (
                     <div key={s.id} className={styles.summonCard} style={{ background: bg, borderColor: border, color }}>
                       <span className={styles.summonEmoji}>{s.emoji}</span>
@@ -229,7 +245,7 @@ export default function Combat({ gameState, myId, onAction, onReset, onClearUlt,
         </div>
 
         {/* ACTION PANEL */}
-        {myPlayer && (
+        {myPlayer && myBuffs && (
           <div className={styles.actionPanel}>
             {/* My Status */}
             <div className={[
@@ -249,17 +265,17 @@ export default function Combat({ gameState, myId, onAction, onReset, onClearUlt,
                   <span className={styles.waitingBadge}>⌛ {activePl.name}</span>
                 )}
                 {isTransformed && (
-                  <span className={styles.transformedBadge}>🌟 {myPlayer.buffs.transformTurnsLeft}t</span>
+                  <span className={styles.transformedBadge}>🌟 {myBuffs.transformTurnsLeft}t</span>
                 )}
               </div>
 
               <StatBar value={myPlayer.hp} max={myPlayer.maxHp} color="var(--hp-color)" label="HP" />
               <StatBar value={myPlayer.mp} max={myPlayer.maxMp} color="var(--mp-color)" label="MP" />
               <div className={styles.xpRow}>
-                <div className={styles.xpFill} style={{ width: `${(myPlayer.xp/myPlayer.xpToNextLevel)*100}%` }} />
+                <div className={styles.xpFill} style={{ width: `${(myPlayer.xp / myPlayer.xpToNextLevel) * 100}%` }} />
               </div>
               <div className={styles.xpText}>{myPlayer.xp}/{myPlayer.xpToNextLevel} XP</div>
-              <BuffChips player={myPlayer} />
+              <BuffChips player={myPlayer} buffs={myBuffs} />
             </div>
 
             {canAct ? (
@@ -283,7 +299,7 @@ export default function Combat({ gameState, myId, onAction, onReset, onClearUlt,
                   </div>
                 )}
 
-                {/* Transform button */}
+                {/* Transform */}
                 {hasTransformItem && (
                   <button
                     className={[
@@ -291,7 +307,7 @@ export default function Combat({ gameState, myId, onAction, onReset, onClearUlt,
                       styles.transformBtn,
                       canTransform ? styles.transformReady : '',
                       isTransformed ? styles.transformActive : '',
-                      myPlayer.buffs.transformUsedThisCombat && !isTransformed ? styles.transformUsed : '',
+                      myBuffs.transformUsedThisCombat && !isTransformed ? styles.transformUsed : '',
                     ].join(' ')}
                     onClick={() => canTransform && onTransform()}
                     disabled={!canTransform}
@@ -300,25 +316,27 @@ export default function Combat({ gameState, myId, onAction, onReset, onClearUlt,
                     <div style={{ flex: 1, textAlign: 'left' }}>
                       <div style={{
                         fontFamily: 'Cinzel, serif', fontSize: 10, letterSpacing: '0.1em',
-                        color: isTransformed ? 'var(--accent-gold-bright)' : myPlayer.buffs.transformUsedThisCombat ? 'var(--text-dim)' : 'var(--accent-gold-bright)',
+                        color: isTransformed ? 'var(--accent-gold-bright)' : myBuffs.transformUsedThisCombat ? 'var(--text-dim)' : 'var(--accent-gold-bright)',
                       }}>
                         {isTransformed
-                          ? `✨ ${transform?.name} (${myPlayer.buffs.transformTurnsLeft}t)`
-                          : myPlayer.buffs.transformUsedThisCombat
+                          ? `✨ ${transform?.name} (${myBuffs.transformTurnsLeft}t)`
+                          : myBuffs.transformUsedThisCombat
                             ? '🌟 Essência Esgotada'
                             : `🌟 TRANSFORMAR: ${transform?.name}`}
                       </div>
                       <div style={{ fontSize: 9, color: 'var(--text-dim)', fontFamily: 'Cinzel, serif' }}>
-                        {isTransformed ? 'Skills divinas ativas' : myPlayer.buffs.transformUsedThisCombat ? '1 uso por combate' : `6t · ATK×${transform?.atkMultiplier} DEF×${transform?.defMultiplier}`}
+                        {isTransformed ? 'Skills divinas ativas'
+                          : myBuffs.transformUsedThisCombat ? '1 uso por combate'
+                          : `6t · ATK×${transform?.atkMultiplier} DEF×${transform?.defMultiplier}`}
                       </div>
                     </div>
-                    {!myPlayer.buffs.transformUsedThisCombat && !isTransformed && (
-                      <span style={{ fontFamily: 'Cinzel, serif', fontSize: 9, color: 'var(--accent-gold-bright)', background: 'rgba(212,160,23,0.15)', padding: '2px 5px', borderRadius: 3, border: '1px solid rgba(212,160,23,0.3)' }}>1×</span>
+                    {!myBuffs.transformUsedThisCombat && !isTransformed && (
+                      <span style={{ fontFamily: 'Cinzel, serif', fontSize: 9, color: 'var(--accent-gold-bright)', background: 'rgba(212,160,23,0.15)', padding: '2px 5px', border: '1px solid rgba(212,160,23,0.3)' }}>1×</span>
                     )}
                   </button>
                 )}
 
-                {/* Attack */}
+                {/* Attack button */}
                 <button className={styles.attackBtn} onClick={doAttack}
                   disabled={!selectedTarget || !aliveM.find(m => m.id === selectedTarget)}>
                   {isTransformed ? `${transform?.emoji} ` : '⚔️ '}
@@ -332,7 +350,7 @@ export default function Combat({ gameState, myId, onAction, onReset, onClearUlt,
                   <div className={styles.potionRow}>
                     {myPotions.map(pot => (
                       <button key={pot.id} className={styles.potionBtn}
-                        onClick={() => onAction({ type: 'use_potion', itemId: pot.id })}
+                        onClick={() => onAction({ type: 'use_item', itemId: pot.id })}
                         title={pot.description}>
                         {pot.emoji} {pot.name}
                         <span className={styles.potionQty}>x{pot.quantity}</span>
@@ -343,66 +361,66 @@ export default function Combat({ gameState, myId, onAction, onReset, onClearUlt,
 
                 {/* Skills */}
                 <div className={styles.skillGrid}>
-                  {isTransformed && transform ? (
-                    transform.skillOverrides.map((skill, i) => {
-                      const canUse = myPlayer.mp >= skill.mpCost;
-                      return (
-                        <button key={i}
-                          className={[styles.skillBtn, styles.transformSkillBtn, selectedSkillIdx === i ? styles.skillSelected : ''].join(' ')}
-                          onClick={() => pickSkill(i)} disabled={!canUse} title={skill.description}>
-                          <span className={styles.skillEmoji}>{skill.emoji}</span>
-                          <span className={styles.skillName}>{skill.name}</span>
-                          {skill.targetAlly && <span className={styles.allyTag}>aliado</span>}
-                          {skill.mpCost > 0 && <span className={styles.skillMp} style={{ color: 'var(--accent-gold-bright)', background: 'rgba(212,160,23,0.12)', borderColor: 'rgba(212,160,23,0.25)' }}>{skill.mpCost}MP</span>}
-                        </button>
-                      );
-                    })
-                  ) : (
-                    SKILLS[myPlayer.classType].map((skill, i) => {
-                      const canUse = myPlayer.mp >= skill.mpCost;
-                      const isAlly = !!skill.targetAlly;
-                      const isUlt = skill.effect === 'ult';
-                      const ultLocked = isUlt && myPlayer.level < (skill.ultLevel ?? 3);
-                      const ultReady  = isUlt && !ultLocked && canUse;
+                  {currentSkills.map((skill, i) => {
+                    const canUse = myPlayer.mp >= skill.mpCost;
+                    const isAlly = 'target' in skill
+                      ? skill.target === 'ally' || skill.target === 'ally_aoe'
+                      : !!(skill as any).targetAlly;
+                    const isUlt    = ('isUlt' in skill && skill.isUlt) || (skill as any).effect === 'ult';
+                    const ultLevel = (skill as any).ultLevel ?? 3;
+                    const ultLocked = isUlt && myPlayer.level < ultLevel;
+                    const ultReady  = isUlt && !ultLocked && canUse;
+                    const isTransformSkill = isTransformed;
 
-                      return (
-                        <button key={i}
-                          className={[
-                            styles.skillBtn,
-                            i >= 3 ? styles.specialBtn : '',
-                            selectedSkillIdx === i ? styles.skillSelected : '',
-                            isAlly ? styles.allySkillBtn : '',
-                            isUlt ? styles.ultBtn : '',
-                            isUlt && ultReady ? styles.ultReady : '',
-                            isUlt && ultLocked ? styles.ultLocked : '',
-                          ].join(' ')}
-                          onClick={() => !ultLocked && pickSkill(i)}
-                          disabled={ultLocked || !canUse}
-                          title={ultLocked ? `Nível ${skill.ultLevel} necessário` : skill.description}>
-                          <span className={styles.skillEmoji}>{skill.emoji}</span>
-                          <span className={styles.skillName}>
-                            {isUlt ? (ultLocked ? `🔒 ${skill.name}` : `⚡ ${skill.name}`) : skill.name}
+                    return (
+                      <button key={i}
+                        className={[
+                          styles.skillBtn,
+                          i >= 3 ? styles.specialBtn : '',
+                          selectedSkillIdx === i ? styles.skillSelected : '',
+                          isAlly ? styles.allySkillBtn : '',
+                          isUlt ? styles.ultBtn : '',
+                          isUlt && ultReady ? styles.ultReady : '',
+                          isUlt && ultLocked ? styles.ultLocked : '',
+                          isTransformSkill ? styles.transformSkillBtn : '',
+                        ].join(' ')}
+                        onClick={() => !ultLocked && pickSkill(i)}
+                        disabled={ultLocked || !canUse}
+                        title={ultLocked ? `Nível ${ultLevel} necessário` : skill.description}>
+                        <span className={styles.skillEmoji}>{skill.emoji}</span>
+                        <span className={styles.skillName}>
+                          {isUlt ? (ultLocked ? `🔒 ${skill.name}` : `⚡ ${skill.name}`) : skill.name}
+                        </span>
+                        {isAlly && <span className={styles.allyTag}>aliado</span>}
+                        {skill.mpCost > 0 && (
+                          <span className={styles.skillMp} style={
+                            (isUlt || isTransformSkill)
+                              ? { color: 'var(--accent-gold-bright)', background: 'rgba(212,160,23,0.12)', borderColor: 'rgba(212,160,23,0.25)' }
+                              : {}
+                          }>
+                            {skill.mpCost}MP
                           </span>
-                          {isAlly && <span className={styles.allyTag}>aliado</span>}
-                          {skill.mpCost > 0 && (
-                            <span className={styles.skillMp} style={isUlt ? { color: 'var(--accent-gold-bright)', background: 'rgba(212,160,23,0.12)', borderColor: 'rgba(212,160,23,0.25)' } : {}}>
-                              {skill.mpCost}MP
-                            </span>
-                          )}
-                        </button>
-                      );
-                    })
-                  )}
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
 
                 {selectedSkillIdx !== null && (
                   <button
-                    className={currentSkills[selectedSkillIdx]?.effect === 'ult' || isTransformed ? styles.useUltBtn : styles.useSkillBtn}
+                    className={
+                      ('isUlt' in currentSkills[selectedSkillIdx] && currentSkills[selectedSkillIdx].isUlt) || isTransformed
+                        ? styles.useUltBtn
+                        : styles.useSkillBtn
+                    }
                     onClick={doSkill}
                     disabled={(needsAllyTarget || needsEnemyTarget) && !selectedTarget}
-                    style={isTransformed ? { background: `linear-gradient(135deg, ${transform?.ultColor}55, ${transform?.ultColor}99)`, color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,0.7)' } : {}}
+                    style={isTransformed && transform ? {
+                      background: `linear-gradient(135deg, ${transform.ultColor}55, ${transform.ultColor}99)`,
+                      color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,0.7)',
+                    } : {}}
                   >
-                    {isTransformed ? `${transform?.emoji} Usar: ` : currentSkills[selectedSkillIdx]?.effect === 'ult' ? '🌟 ATIVAR: ' : '✨ Usar: '}
+                    {isTransformed ? `${transform?.emoji} Usar: ` : ('isUlt' in currentSkills[selectedSkillIdx] && currentSkills[selectedSkillIdx].isUlt) ? '🌟 ATIVAR: ' : '✨ Usar: '}
                     {currentSkills[selectedSkillIdx]?.name}
                     {(needsAllyTarget || needsEnemyTarget) && !selectedTarget ? ' (selecione alvo)' : ''}
                   </button>
@@ -419,16 +437,18 @@ export default function Combat({ gameState, myId, onAction, onReset, onClearUlt,
         )}
       </div>
 
-      {/* ── PLAYERS ROW ── */}
+      {/* PLAYERS ROW */}
       <div className={styles.playersRow}>
         {gameState.playerOrder.map(pid => {
           const p = gameState.players[pid];
           if (!p) return null;
+          const pBuffs = getPlayerBuffs(p);
           const isActive = gameState.activePlayerId === pid;
-          const pTransformed = p.buffs.transformTurnsLeft > 0;
+          const pTransformed = pBuffs.transformTurnsLeft > 0;
           const pTransform = TRANSFORMS[p.classType];
           const allySelectable = canAct && targetMode === 'ally' && needsAllyTarget;
           const allySelected = selectedTarget === pid && targetMode === 'ally';
+
           return (
             <div key={pid}
               className={[
@@ -442,7 +462,7 @@ export default function Combat({ gameState, myId, onAction, onReset, onClearUlt,
               onClick={() => allySelectable && setSelectedTarget(prev => prev === pid ? null : pid)}
             >
               <div className={styles.miniHeader}>
-                <span>{pTransformed ? pTransform.emoji : CLASSES[p.classType].emoji}</span>
+                <span>{pTransformed && pTransform ? pTransform.emoji : CLASSES[p.classType].emoji}</span>
                 <span className={styles.miniName}>{p.name}</span>
                 {pid === myId && <span className={styles.youTag}>você</span>}
                 <span className={styles.levelTag}>Nv.{p.level}</span>
@@ -453,25 +473,25 @@ export default function Combat({ gameState, myId, onAction, onReset, onClearUlt,
               <SmallBar value={p.mp} max={p.maxMp} color="var(--mp-color)" />
               <div className={styles.miniBuffs}>
                 {pTransformed && <span className={styles.miniBuff} title="Transformado">🌟</span>}
-                {p.buffs.wallTurnsLeft > 0 && <span className={styles.miniBuff} title="Muralha">🏰</span>}
-                {p.buffs.dodgeTurnsLeft > 0 && <span className={styles.miniBuff} title="Esquiva">💨</span>}
-                {p.buffs.regenTurnsLeft > 0 && <span className={styles.miniBuff} title="Regen">♻️</span>}
-                {p.buffs.tempBonusTurns > 0 && <span className={styles.miniBuff} title="Buffado">✨</span>}
-                {p.buffs.counterReflect > 0 && <span className={styles.miniBuff} title="Contra-Ataque">🔄</span>}
-                {(p.buffs.cloneTurnsLeft ?? 0) > 0 && <span className={styles.miniBuff} title="Clone">👤</span>}
-                {(p.buffs.soulCount ?? 0) > 0 && (
-                  <span className={styles.miniBuff} title={`${p.buffs.soulCount} almas`} style={{ color: '#8e44ad', fontSize: 9, fontFamily: 'Cinzel, serif' }}>
-                    💀{p.buffs.soulCount}
+                {pBuffs.wallTurnsLeft > 0      && <span className={styles.miniBuff} title="Muralha">🏰</span>}
+                {pBuffs.dodgeTurnsLeft > 0     && <span className={styles.miniBuff} title="Esquiva">💨</span>}
+                {pBuffs.regenTurnsLeft > 0     && <span className={styles.miniBuff} title="Regen">♻️</span>}
+                {pBuffs.tempBonusTurns > 0     && <span className={styles.miniBuff} title="Buffado">✨</span>}
+                {pBuffs.counterReflect > 0     && <span className={styles.miniBuff} title="Contra-Ataque">🔄</span>}
+                {pBuffs.cloneTurnsLeft > 0     && <span className={styles.miniBuff} title="Clone">👤</span>}
+                {p.soulCount > 0 && (
+                  <span className={styles.miniBuff} title={`${p.soulCount} almas`} style={{ color: '#8e44ad', fontSize: 9, fontFamily: 'Cinzel, serif' }}>
+                    💀{p.soulCount}
                   </span>
                 )}
-                {(p.buffs.summonCount ?? 0) > 0 && (
+                {p.summonCount > 0 && (
                   <span className={styles.miniBuff} style={{ fontSize: 9, fontFamily: 'Cinzel, serif', color: '#a0522d' }}>
-                    🐾{p.buffs.summonCount}
+                    🐾{p.summonCount}
                   </span>
                 )}
-                {(p.buffs.spiritStacks ?? 0) > 0 && (
+                {p.spiritStacks > 0 && (
                   <span className={styles.miniBuff} style={{ fontSize: 9, fontFamily: 'Cinzel, serif', color: '#5f9ea0' }}>
-                    🌀{p.buffs.spiritStacks}
+                    🌀{p.spiritStacks}
                   </span>
                 )}
               </div>
@@ -480,7 +500,7 @@ export default function Combat({ gameState, myId, onAction, onReset, onClearUlt,
         })}
       </div>
 
-      {/* ── COMBAT LOG ── */}
+      {/* COMBAT LOG */}
       <div className={styles.logPanel}>
         <div className={styles.logTitle}>
           Registro de Combate
@@ -500,19 +520,23 @@ export default function Combat({ gameState, myId, onAction, onReset, onClearUlt,
   );
 }
 
-/* ═══ SUB-COMPONENTS ══════════════════════════════════════════════ */
+// ═══ SUB-COMPONENTS ════════════════════════════════════════
 
 function MonsterCard({ monster, isSelected, canSelect, onClick, flashType }: {
-  monster: Monster; isSelected: boolean; canSelect: boolean; onClick: () => void;
+  monster: Monster;
+  isSelected: boolean;
+  canSelect: boolean;
+  onClick: () => void;
   flashType: 'hit' | 'heal' | null;
 }) {
   const hp  = (monster.hp / monster.maxHp) * 100;
   const eff = monster.effects ?? [];
-  const poisoned = eff.some((e: MonsterEffect) => e.type === 'poisoned');
-  const stunned  = eff.some((e: MonsterEffect) => e.type === 'stunned');
-  const cursed   = eff.some((e: MonsterEffect) => e.type === 'cursed');
-  const marked   = eff.some((e: MonsterEffect) => e.type === 'marked');
-  const slowed   = eff.some((e: MonsterEffect) => e.type === 'slowed');
+  // engine usa StatusEffect[] com .type string
+  const poisoned = eff.some(e => e.type === 'poisoned');
+  const stunned  = eff.some(e => e.type === 'stunned');
+  const cursed   = eff.some(e => e.type === 'cursed');
+  const marked   = eff.some(e => e.type === 'marked');
+  const slowed   = eff.some(e => e.type === 'slowed');
   const isDead   = monster.hp <= 0;
 
   return (
@@ -523,7 +547,7 @@ function MonsterCard({ monster, isSelected, canSelect, onClick, flashType }: {
         isDead ? styles.monsterDead : '',
         monster.isBoss ? styles.bossCard : '',
         canSelect && !isDead ? styles.monsterHoverable : styles.monsterNoTarget,
-        flashType === 'hit' ? styles.monsterHit : '',
+        flashType === 'hit'  ? styles.monsterHit  : '',
         flashType === 'heal' ? styles.monsterHeal : '',
       ].join(' ')}
       onClick={isDead ? undefined : onClick}
@@ -554,24 +578,20 @@ function MonsterCard({ monster, isSelected, canSelect, onClick, flashType }: {
   );
 }
 
-function BuffChips({ player }: { player: GameState['players'][string] }) {
-  const b = player.buffs;
+function BuffChips({ player, buffs }: { player: Player; buffs: ReturnType<typeof getPlayerBuffs> }) {
   const chips: { label: string; color: string; bg: string }[] = [];
-  if (b.tempBonusTurns > 0) {
-    if (b.tempAtkBonus > 0)  chips.push({ label: `⚔️+${b.tempAtkBonus}(${b.tempBonusTurns}t)`, color: '#f0c040', bg: 'rgba(212,160,23,.1)' });
-    if (b.tempDefBonus > 0)  chips.push({ label: `🛡️+${b.tempDefBonus}(${b.tempBonusTurns}t)`, color: '#3498db', bg: 'rgba(52,152,219,.1)' });
-    if (b.tempDefBonus < 0)  chips.push({ label: `🛡️${b.tempDefBonus}`, color: '#e74c3c', bg: 'rgba(231,76,60,.1)' });
+  if (buffs.tempBonusTurns > 0) {
+    if (buffs.tempAtkBonus > 0) chips.push({ label: `⚔️+${buffs.tempAtkBonus}(${buffs.tempBonusTurns}t)`, color: '#f0c040', bg: 'rgba(212,160,23,.1)' });
+    if (buffs.tempDefBonus > 0) chips.push({ label: `🛡️+${buffs.tempDefBonus}(${buffs.tempBonusTurns}t)`, color: '#3498db', bg: 'rgba(52,152,219,.1)' });
   }
-  if (b.regenTurnsLeft > 0)      chips.push({ label: `♻️+${b.regenHpPerTurn}HP(${b.regenTurnsLeft}t)`, color: '#2ecc71', bg: 'rgba(39,174,96,.1)' });
-  if (b.wallTurnsLeft > 0)       chips.push({ label: `🏰Muralha(${b.wallTurnsLeft}t)`, color: '#bdc3c7', bg: 'rgba(127,140,141,.15)' });
-  if (b.dodgeTurnsLeft > 0)      chips.push({ label: `💨Esquiva(${b.dodgeTurnsLeft}t)`, color: '#1abc9c', bg: 'rgba(26,188,156,.1)' });
-  if (b.necroBonusTurnsLeft > 0) chips.push({ label: `💀+${b.necroBonusDmg}dmg(${b.necroBonusTurnsLeft}t)`, color: '#9b59b6', bg: 'rgba(142,68,173,.1)' });
-  if (b.aimBonus > 0)            chips.push({ label: `🦅Mira+${b.aimBonus}`, color: '#3498db', bg: 'rgba(52,152,219,.1)' });
-  if (b.counterReflect > 0)      chips.push({ label: `🔄Contra${Math.round(b.counterReflect*100)}%`, color: '#e67e22', bg: 'rgba(230,126,34,.1)' });
-  if (player.classType === 'necromancer') chips.push({ label: `💀${b.soulCount ?? 0}/5alma`, color: '#8e44ad', bg: 'rgba(142,68,173,.15)' });
-  if (player.classType === 'animalist')  chips.push({ label: `🐾${b.summonCount ?? 0}/3`, color: '#a0522d', bg: 'rgba(160,82,45,.15)' });
-  if (player.classType === 'shaman')     chips.push({ label: `🌀${b.spiritStacks ?? 0}/5`, color: '#5f9ea0', bg: 'rgba(95,158,160,.15)' });
-  if ((b.cloneTurnsLeft ?? 0) > 0)       chips.push({ label: `👤Clone(${b.cloneTurnsLeft}t)`, color: '#da70d6', bg: 'rgba(218,112,214,.15)' });
+  if (buffs.regenTurnsLeft > 0) chips.push({ label: `♻️+${buffs.regenHpPerTurn}HP(${buffs.regenTurnsLeft}t)`, color: '#2ecc71', bg: 'rgba(39,174,96,.1)' });
+  if (buffs.wallTurnsLeft > 0)  chips.push({ label: `🏰Muralha(${buffs.wallTurnsLeft}t)`, color: '#bdc3c7', bg: 'rgba(127,140,141,.15)' });
+  if (buffs.dodgeTurnsLeft > 0) chips.push({ label: `💨Esquiva(${buffs.dodgeTurnsLeft}t)`, color: '#1abc9c', bg: 'rgba(26,188,156,.1)' });
+  if (buffs.counterReflect > 0) chips.push({ label: `🔄Contra${Math.round(buffs.counterReflect * 100)}%`, color: '#e67e22', bg: 'rgba(230,126,34,.1)' });
+  if (player.classType === 'necromancer') chips.push({ label: `💀${player.soulCount ?? 0}/5alma`, color: '#8e44ad', bg: 'rgba(142,68,173,.15)' });
+  if (player.classType === 'animalist')   chips.push({ label: `🐾${player.summonCount ?? 0}/3`, color: '#a0522d', bg: 'rgba(160,82,45,.15)' });
+  if (player.classType === 'shaman')      chips.push({ label: `🌀${player.spiritStacks ?? 0}/5`, color: '#5f9ea0', bg: 'rgba(95,158,160,.15)' });
+  if (buffs.cloneTurnsLeft > 0)          chips.push({ label: `👤Clone(${buffs.cloneTurnsLeft}t)`, color: '#da70d6', bg: 'rgba(218,112,214,.15)' });
   if (chips.length === 0) return null;
   return (
     <div className={styles.buffRow}>
@@ -589,7 +609,7 @@ function StatBar({ value, max, color, label }: { value: number; max: number; col
     <div className={styles.barRow}>
       <span className={styles.barLabel}>{label}</span>
       <div className={styles.barTrack}>
-        <div className={styles.barFill} style={{ width: `${Math.max(0,(value/max)*100)}%`, background: color }} />
+        <div className={styles.barFill} style={{ width: `${Math.max(0, (value / max) * 100)}%`, background: color }} />
       </div>
       <span className={styles.barText}>{value}/{max}</span>
     </div>
@@ -599,7 +619,7 @@ function StatBar({ value, max, color, label }: { value: number; max: number; col
 function SmallBar({ value, max, color }: { value: number; max: number; color: string }) {
   return (
     <div className={styles.smallBar}>
-      <div className={styles.smallBarFill} style={{ width: `${Math.max(0,(value/max)*100)}%`, background: color }} />
+      <div className={styles.smallBarFill} style={{ width: `${Math.max(0, (value / max) * 100)}%`, background: color }} />
     </div>
   );
 }
