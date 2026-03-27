@@ -7,238 +7,221 @@ interface ActionFeedProps {
   log: CombatLogEntry[];
 }
 
-interface FeedEntry extends CombatLogEntry {
-  visible: boolean;
+interface Toast {
+  id: string;
+  message: string;
+  type: CombatLogEntry['type'];
+  dying: boolean;
 }
 
 const TYPE_CONFIG: Record<string, {
   icon: string;
   color: string;
-  bg: string;
   border: string;
+  bg: string;
   glow: string;
-  labelColor: string;
-  label: string;
 }> = {
   player_action: {
     icon: '⚔️',
-    color: '#6699ff',
-    bg: 'linear-gradient(135deg, rgba(30,40,100,0.7), rgba(20,30,80,0.5))',
+    color: '#88aaff',
     border: '#2244aa',
-    glow: 'none',
-    labelColor: '#4466cc',
-    label: 'ACTION',
+    bg: 'linear-gradient(135deg, rgba(20,30,100,0.92), rgba(10,16,60,0.88))',
+    glow: '0 0 18px rgba(68,100,255,0.35)',
   },
   monster_action: {
     icon: '👹',
-    color: '#ff7744',
-    bg: 'linear-gradient(135deg, rgba(100,30,10,0.7), rgba(80,20,5,0.5))',
+    color: '#ff8855',
     border: '#aa3300',
-    glow: 'none',
-    labelColor: '#882200',
-    label: 'ENEMY',
+    bg: 'linear-gradient(135deg, rgba(100,24,8,0.92), rgba(60,12,4,0.88))',
+    glow: '0 0 18px rgba(255,80,20,0.35)',
   },
   system: {
     icon: '📜',
-    color: '#6666aa',
-    bg: 'rgba(20,20,40,0.6)',
+    color: '#8888bb',
     border: '#333366',
+    bg: 'rgba(16,16,36,0.88)',
     glow: 'none',
-    labelColor: '#444466',
-    label: 'SYS',
   },
   level_up: {
     icon: '⬆',
     color: '#ffcc00',
-    bg: 'linear-gradient(135deg, rgba(100,70,0,0.7), rgba(60,40,0,0.5))',
     border: '#cc8800',
-    glow: '3px 3px 0 #553300, 0 0 12px rgba(255,200,0,0.4)',
-    labelColor: '#aa7700',
-    label: 'LEVEL',
+    bg: 'linear-gradient(135deg, rgba(100,65,0,0.92), rgba(60,36,0,0.88))',
+    glow: '0 0 22px rgba(255,200,0,0.5)',
   },
   death: {
     icon: '💀',
     color: '#ff4444',
-    bg: 'linear-gradient(135deg, rgba(100,0,0,0.7), rgba(60,0,0,0.5))',
     border: '#880000',
-    glow: '3px 3px 0 #440000, 0 0 12px rgba(255,0,0,0.3)',
-    labelColor: '#660000',
-    label: 'DEFEAT',
+    bg: 'linear-gradient(135deg, rgba(100,0,0,0.92), rgba(60,0,0,0.88))',
+    glow: '0 0 22px rgba(255,0,0,0.4)',
   },
 };
 
+// Which log types should show as toasts (skip spammy system messages)
+const SHOW_TYPES = new Set(['player_action', 'monster_action', 'level_up', 'death']);
+
+// Filter out very short/boring system lines, only show impactful ones
+function shouldShow(entry: CombatLogEntry): boolean {
+  if (SHOW_TYPES.has(entry.type)) return true;
+  // Show important system messages
+  if (entry.type === 'system') {
+    const msg = entry.message;
+    return (
+      msg.includes('ESQUIVA') ||
+      msg.includes('CRÍTICO') ||
+      msg.includes('EXECUÇÃO') ||
+      msg.includes('CONTRA-ATACA') ||
+      msg.includes('ENRAIVECEU') ||
+      msg.includes('MURALHA') ||
+      msg.includes('atordoado') ||
+      msg.includes('envenenado') ||
+      msg.includes('ressuscita') ||
+      msg.includes('Transformação') ||
+      msg.includes('TRANSFORMAÇÃO')
+    );
+  }
+  return false;
+}
+
 export default function ActionFeed({ log }: ActionFeedProps) {
-  const [entries, setEntries] = useState<FeedEntry[]>([]);
+  const [toasts, setToasts] = useState<Toast[]>([]);
   const prevLenRef = useRef(0);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const timerRefs = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   useEffect(() => {
-    if (log.length === prevLenRef.current) return;
-    const newOnes = log.slice(prevLenRef.current);
+    if (log.length <= prevLenRef.current) return;
+    const newEntries = log.slice(prevLenRef.current).filter(shouldShow);
     prevLenRef.current = log.length;
 
-    setEntries(prev => {
-      const added = newOnes.map(e => ({ ...e, visible: false }));
-      return [...prev, ...added].slice(-18);
-    });
+    if (newEntries.length === 0) return;
 
-    newOnes.forEach((_, i) => {
+    // Add toasts staggered
+    newEntries.forEach((entry, i) => {
+      const toastId = entry.id;
       setTimeout(() => {
-        setEntries(prev => {
-          const idx = prev.findIndex(e => e.id === newOnes[i].id);
-          if (idx === -1) return prev;
-          const copy = [...prev];
-          copy[idx] = { ...copy[idx], visible: true };
-          return copy;
+        setToasts(prev => {
+          // max 4 visible at once — remove oldest if needed
+          const trimmed = prev.length >= 4 ? prev.slice(1) : prev;
+          return [...trimmed, { id: toastId, message: entry.message, type: entry.type, dying: false }];
         });
-      }, i * 60);
+
+        // Start fade-out after 2.8s
+        const fadeTimer = setTimeout(() => {
+          setToasts(prev => prev.map(t => t.id === toastId ? { ...t, dying: true } : t));
+          // Remove after fade
+          const removeTimer = setTimeout(() => {
+            setToasts(prev => prev.filter(t => t.id !== toastId));
+            timerRefs.current.delete(toastId);
+          }, 400);
+          timerRefs.current.set(toastId + '_rm', removeTimer);
+        }, 2800);
+
+        timerRefs.current.set(toastId, fadeTimer);
+      }, i * 120);
     });
   }, [log]);
 
+  // Cleanup on unmount
   useEffect(() => {
-    if (containerRef.current) {
-      containerRef.current.scrollTop = containerRef.current.scrollHeight;
-    }
-  }, [entries]);
+    return () => {
+      timerRefs.current.forEach(t => clearTimeout(t));
+    };
+  }, []);
 
-  const visible = entries.slice(-12);
+  if (toasts.length === 0) return null;
 
   return (
     <div style={{
       position: 'fixed',
-      right: 10,
-      top: '50%',
-      transform: 'translateY(-50%)',
-      width: 260,
-      maxHeight: '54vh',
+      top: 68,
+      left: '50%',
+      transform: 'translateX(-50%)',
       display: 'flex',
       flexDirection: 'column',
+      alignItems: 'center',
+      gap: 6,
+      zIndex: 400,
       pointerEvents: 'none',
-      zIndex: 100,
-      imageRendering: 'pixelated',
+      width: 'min(520px, 90vw)',
     }}>
-      {/* Header — pixel style */}
-      <div style={{
-        fontFamily: "'Press Start 2P', monospace",
-        fontSize: 7,
-        letterSpacing: '0.12em',
-        color: 'rgba(100,100,180,0.55)',
-        textTransform: 'uppercase',
-        padding: '0 2px 5px',
-        borderBottom: '2px solid #1e1e42',
-        marginBottom: 5,
-        display: 'flex',
-        alignItems: 'center',
-        gap: 5,
-        textShadow: '1px 1px 0 rgba(0,0,0,0.8)',
-      }}>
-        {/* Pixel blinking dot */}
-        <span style={{
-          width: 6, height: 6,
-          background: '#ffcc00',
-          boxShadow: '0 0 6px rgba(255,200,0,0.6)',
-          display: 'inline-block',
-          animation: 'pixelBlink 1s step-end infinite',
-          imageRendering: 'pixelated',
-        }} />
-        BATTLE LOG
-      </div>
+      {toasts.map((toast, idx) => {
+        const cfg = TYPE_CONFIG[toast.type] ?? TYPE_CONFIG.system;
+        const isNewest = idx === toasts.length - 1;
+        const age = idx / Math.max(toasts.length - 1, 1); // 0 = oldest, 1 = newest
 
-      <div
-        ref={containerRef}
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 2,
-          overflowY: 'auto',
-          scrollbarWidth: 'none',
-        }}
-      >
-        {visible.map((entry, i) => {
-          const cfg = TYPE_CONFIG[entry.type] ?? TYPE_CONFIG.system;
-          const age = i / visible.length;
-          const opacity = 0.22 + age * 0.78;
-          const isNewest = i === visible.length - 1;
+        return (
+          <div
+            key={toast.id}
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              padding: '7px 14px 7px 10px',
+              background: cfg.bg,
+              border: `2px solid ${cfg.border}`,
+              boxShadow: isNewest ? cfg.glow : 'none',
+              opacity: toast.dying ? 0 : (0.35 + age * 0.65),
+              transform: toast.dying
+                ? 'translateY(-10px) scale(0.95)'
+                : isNewest
+                  ? 'scale(1)'
+                  : `scale(${0.97 - (toasts.length - 1 - idx) * 0.01})`,
+              transition: toast.dying
+                ? 'opacity 0.38s ease, transform 0.38s ease'
+                : 'opacity 0.18s ease, transform 0.18s ease',
+              animation: !toast.dying ? 'toastSlideIn 0.22s ease' : 'none',
+              backdropFilter: 'blur(4px)',
+            }}
+          >
+            {/* Left accent bar */}
+            <div style={{
+              width: 3,
+              alignSelf: 'stretch',
+              background: cfg.color,
+              flexShrink: 0,
+              opacity: isNewest ? 1 : 0.4,
+            }} />
 
-          return (
-            <div
-              key={entry.id}
-              style={{
-                background: cfg.bg,
-                border: `2px solid ${cfg.border}`,
-                padding: '4px 7px',
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: 5,
-                opacity: entry.visible ? opacity : 0,
-                transform: entry.visible
-                  ? 'translateX(0)'
-                  : 'translateX(28px)',
-                transition: 'all 0.25s steps(6, end)',
-                boxShadow: isNewest ? cfg.glow : 'none',
-                pointerEvents: 'auto',
-                position: 'relative',
-                overflow: 'hidden',
-                imageRendering: 'pixelated',
-              }}
-            >
-              {/* Newest entry highlight */}
-              {isNewest && (
-                <div style={{
-                  position: 'absolute',
-                  left: 0, top: 0, bottom: 0,
-                  width: 3,
-                  background: cfg.color,
-                  animation: 'pixelBlink 0.5s step-end 3',
-                }} />
-              )}
+            {/* Icon */}
+            <span style={{ fontSize: 16, flexShrink: 0, lineHeight: 1 }}>
+              {cfg.icon}
+            </span>
 
-              {/* Icon + label column */}
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, flexShrink: 0, marginTop: 1 }}>
-                <span style={{ fontSize: 10 }}>{cfg.icon}</span>
-                <span style={{
-                  fontFamily: "'Press Start 2P', monospace",
-                  fontSize: 4,
-                  color: cfg.labelColor,
-                  letterSpacing: '0.06em',
-                  textShadow: '1px 1px 0 rgba(0,0,0,0.8)',
-                }}>
-                  {cfg.label}
-                </span>
-              </div>
+            {/* Message */}
+            <span style={{
+              fontFamily: "'VT323', monospace",
+              fontSize: 18,
+              color: cfg.color,
+              lineHeight: 1.25,
+              flex: 1,
+              wordBreak: 'break-word',
+              opacity: isNewest ? 1 : 0.75,
+            }}>
+              {toast.message}
+            </span>
 
-              <div style={{ flex: 1, minWidth: 0 }}>
-                {/* Turn indicator */}
-                <div style={{
-                  fontFamily: "'Press Start 2P', monospace",
-                  fontSize: 5,
-                  color: 'rgba(80,80,140,0.5)',
-                  letterSpacing: '0.06em',
-                  marginBottom: 1,
-                }}>
-                  T{entry.turn}
-                </div>
-                {/* Message */}
-                <span style={{
-                  fontFamily: "'VT323', monospace",
-                  fontSize: 15,
-                  color: cfg.color,
-                  lineHeight: 1.3,
-                  display: 'block',
-                  wordBreak: 'break-word',
-                }}>
-                  {entry.message}
-                </span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+            {/* Turn badge — only newest */}
+            {isNewest && (
+              <span style={{
+                fontFamily: "'Press Start 2P', monospace",
+                fontSize: 6,
+                color: 'rgba(100,100,160,0.6)',
+                flexShrink: 0,
+                letterSpacing: '0.06em',
+              }}>
+                T{log.find(e => e.id === toast.id)?.turn ?? ''}
+              </span>
+            )}
+          </div>
+        );
+      })}
 
       <style>{`
-        @keyframes pixelBlink {
-          0%, 49% { opacity: 1; }
-          50%, 100% { opacity: 0; }
+        @keyframes toastSlideIn {
+          from { opacity: 0; transform: translateY(-10px) scale(0.96); }
+          to   { opacity: 1; transform: translateY(0) scale(1); }
         }
       `}</style>
     </div>
