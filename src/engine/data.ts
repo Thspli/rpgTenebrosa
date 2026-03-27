@@ -509,4 +509,4 @@ export function createNecroShadow(base: Monster | null, ownerId: string, ownerLe
 }
 
 // Re-export BALANCE for use in other files
-export { BALANCE } from '../../engine/utils';
+export { BALANCE } from './utils';
