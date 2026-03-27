@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { CombatLogEntry } from '@/lib/types';
 
 /* ════════════════════════════════════════════════════
-   FLOATING DAMAGE NUMBERS
+   FLOATING DAMAGE NUMBERS — Pixel JRPG Style
    ════════════════════════════════════════════════════ */
 
 interface DmgNumber {
@@ -17,16 +17,45 @@ interface DmgNumber {
 }
 
 const DMG_CONFIGS = {
-  damage: { color: '#ff4444', shadow: '#8b0000', size: 22, prefix: '-', suffix: '' },
-  crit:   { color: '#ff8800', shadow: '#ff4400', size: 30, prefix: '-', suffix: '!!' },
-  heal:   { color: '#2ecc71', shadow: '#1a7a44', size: 20, prefix: '+', suffix: 'HP' },
-  mp:     { color: '#3498db', shadow: '#1a4f80', size: 18, prefix: '+', suffix: 'MP' },
-  miss:   { color: '#888888', shadow: '#333',    size: 16, prefix: '',  suffix: '' },
-  status: { color: '#f0c040', shadow: '#8b6900', size: 16, prefix: '',  suffix: '' },
+  damage: {
+    color: '#ff4444', outline: '#880000',
+    size: 22, prefix: '-', suffix: '',
+    font: "'Press Start 2P', monospace",
+    shadow: '2px 2px 0 #880000, -1px -1px 0 #880000',
+  },
+  crit: {
+    color: '#ffcc00', outline: '#885500',
+    size: 28, prefix: '-', suffix: '!!',
+    font: "'Press Start 2P', monospace",
+    shadow: '3px 3px 0 #885500, -1px -1px 0 #885500, 0 0 20px rgba(255,200,0,0.8)',
+  },
+  heal: {
+    color: '#44ff88', outline: '#006630',
+    size: 20, prefix: '+', suffix: 'HP',
+    font: "'Press Start 2P', monospace",
+    shadow: '2px 2px 0 #006630, -1px -1px 0 #006630',
+  },
+  mp: {
+    color: '#4488ff', outline: '#001188',
+    size: 18, prefix: '+', suffix: 'MP',
+    font: "'Press Start 2P', monospace",
+    shadow: '2px 2px 0 #001188, -1px -1px 0 #001188',
+  },
+  miss: {
+    color: '#888888', outline: '#333',
+    size: 16, prefix: '', suffix: '',
+    font: "'Press Start 2P', monospace",
+    shadow: '2px 2px 0 #333',
+  },
+  status: {
+    color: '#ffc832', outline: '#885500',
+    size: 14, prefix: '', suffix: '',
+    font: "'Press Start 2P', monospace",
+    shadow: '2px 2px 0 #885500',
+  },
 };
 
 function extractDamageFromMessage(msg: string): { value: string; type: DmgNumber['type'] } | null {
-  // Damage patterns
   const critMatch = msg.match(/Dano:\s*(\d+).*?(Execução|execução|EXECUÇÃO|Crítico|crítico|3x|5x)/i) ||
                     msg.match(/(Execução|EXECUÇÃO|execução).*?(\d+)\s*dano/i);
   if (critMatch) return { value: critMatch[1] ?? critMatch[2], type: 'crit' };
@@ -36,14 +65,12 @@ function extractDamageFromMessage(msg: string): { value: string; type: DmgNumber
                    msg.match(/→[^:]+:\s*(\d+)\s*dano/i);
   if (dmgMatch) return { value: dmgMatch[1], type: 'damage' };
 
-  // Heal patterns
   const healMatch = msg.match(/\+(\d+)\s*HP/i);
   if (healMatch) return { value: healMatch[1], type: 'heal' };
 
   const mpMatch = msg.match(/\+(\d+)\s*MP/i);
   if (mpMatch) return { value: mpMatch[1], type: 'mp' };
 
-  // Status
   const statusMatch = msg.match(/(ESQUIVA|ATORDOADO|ENVENENADO|MALDIÇÃO|CONTRA-ATACA)/i);
   if (statusMatch) return { value: statusMatch[1], type: 'status' };
 
@@ -52,8 +79,8 @@ function extractDamageFromMessage(msg: string): { value: string; type: DmgNumber
 
 function getRandomPosition() {
   return {
-    x: 30 + Math.random() * 40,
-    y: 20 + Math.random() * 40,
+    x: 8 + Math.random() * 55,
+    y: 12 + Math.random() * 45,
   };
 }
 
@@ -83,16 +110,13 @@ export function FloatingDamageNumbers({ log }: { log: CombatLogEntry[] }) {
     }
 
     if (newNums.length === 0) return;
-
-    setNumbers(prev => [...prev.slice(-12), ...newNums]);
+    setNumbers(prev => [...prev.slice(-14), ...newNums]);
 
     newNums.forEach((n, i) => {
       setTimeout(() => {
         setNumbers(prev => prev.map(p => p.id === n.id ? { ...p, dying: true } : p));
-        setTimeout(() => {
-          setNumbers(prev => prev.filter(p => p.id !== n.id));
-        }, 600);
-      }, 800 + i * 120);
+        setTimeout(() => setNumbers(prev => prev.filter(p => p.id !== n.id)), 500);
+      }, 900 + i * 100);
     });
   }, [log]);
 
@@ -108,21 +132,40 @@ export function FloatingDamageNumbers({ log }: { log: CombatLogEntry[] }) {
               position: 'absolute',
               left: `${n.x}%`,
               top: `${n.y}%`,
-              fontFamily: "'Cinzel', serif",
+              fontFamily: cfg.font,
               fontSize: cfg.size,
               fontWeight: 900,
               color: cfg.color,
-              textShadow: `0 0 12px ${cfg.shadow}, 0 2px 4px rgba(0,0,0,0.9), 1px 1px 0 ${cfg.shadow}`,
+              textShadow: cfg.shadow,
               whiteSpace: 'nowrap',
-              letterSpacing: isCrit ? '0.1em' : '0.03em',
+              letterSpacing: '0.04em',
+              imageRendering: 'pixelated' as any,
               opacity: n.dying ? 0 : 1,
-              transform: n.dying ? `translateY(-60px) scale(0.8)` : undefined,
-              transition: n.dying ? 'all 0.5s ease' : undefined,
-              animation: n.dying ? 'none' : `${isCrit ? 'critPop' : n.type === 'heal' || n.type === 'mp' ? 'healPop' : 'dmgPop'} 1.1s ease forwards`,
+              transform: n.dying
+                ? `translateY(-50px) scale(0.7)`
+                : undefined,
+              transition: n.dying ? 'all 0.45s ease' : undefined,
+              animation: n.dying
+                ? 'none'
+                : `${isCrit ? 'critPop' : n.type === 'heal' || n.type === 'mp' ? 'healPop' : 'dmgPop'} 1.2s ease forwards`,
               zIndex: 500,
+              userSelect: 'none',
             }}
           >
-            {isCrit && <span style={{ fontSize: cfg.size * 0.55, display: 'block', textAlign: 'center', marginBottom: -4 }}>CRÍTICO</span>}
+            {/* Crit label */}
+            {isCrit && (
+              <div style={{
+                fontSize: 8,
+                letterSpacing: '0.1em',
+                marginBottom: 2,
+                textAlign: 'center',
+                color: '#ff8800',
+                textShadow: '1px 1px 0 #553300',
+                animation: 'glitch 0.3s ease',
+              }}>
+                CRÍTICO!
+              </div>
+            )}
             {cfg.prefix}{n.value}{cfg.suffix}
           </div>
         );
@@ -132,7 +175,7 @@ export function FloatingDamageNumbers({ log }: { log: CombatLogEntry[] }) {
 }
 
 /* ════════════════════════════════════════════════════
-   STATUS POPUP BANNERS  (top-center)
+   STATUS POPUP BANNERS — Pixel JRPG dialog style
    ════════════════════════════════════════════════════ */
 
 interface StatusBanner {
@@ -140,21 +183,27 @@ interface StatusBanner {
   text: string;
   icon: string;
   color: string;
+  outlineColor: string;
   dying: boolean;
 }
 
-const STATUS_PATTERNS: Array<{ pattern: RegExp; icon: string; color: string; label: (m: RegExpMatchArray) => string }> = [
-  { pattern: /EXECUÇÃO|execução/i,    icon: '💀', color: '#ff4400', label: () => 'EXECUÇÃO!' },
-  { pattern: /CRÍTICO|crítico/i,      icon: '⚡', color: '#ff8800', label: () => 'CRÍTICO!' },
-  { pattern: /ESQUIVA/i,              icon: '💨', color: '#1abc9c', label: m => `ESQUIVA! ${m[0]}` },
-  { pattern: /CONTRA-ATACA/i,         icon: '🔄', color: '#e67e22', label: () => 'CONTRA-ATAQUE!' },
-  { pattern: /ENRAIVECEU/i,           icon: '🔴', color: '#ff0000', label: m => 'FÚRIA!' },
-  { pattern: /invulnerável/i,         icon: '🛡️', color: '#aabbcc', label: () => 'INVULNERÁVEL!' },
-  { pattern: /LEVANTOU|ressuscita/i,  icon: '✝️', color: '#f0c040', label: () => 'RESSURREIÇÃO!' },
-  { pattern: /Nível (\d+)/i,          icon: '🎉', color: '#f0c040', label: m => `NÍVEL ${m[1]}!` },
-  { pattern: /MURALHA/i,              icon: '🏰', color: '#bdc3c7', label: () => 'MURALHA!' },
-  { pattern: /TRANSFORMAÇÃO/i,        icon: '🌟', color: '#f0c040', label: () => 'TRANSFORMAÇÃO!' },
-  { pattern: /ULTIMATE|ULTIMATE/i,    icon: '⚡', color: '#f0c040', label: () => 'ULTIMATE!' },
+const STATUS_PATTERNS: Array<{
+  pattern: RegExp;
+  icon: string;
+  color: string;
+  outlineColor: string;
+  label: (m: RegExpMatchArray) => string;
+}> = [
+  { pattern: /EXECUÇÃO|execução/i, icon: '💀', color: '#ff4400', outlineColor: '#550000', label: () => 'EXECUÇÃO!' },
+  { pattern: /CRÍTICO|crítico/i, icon: '⚡', color: '#ffcc00', outlineColor: '#664400', label: () => 'CRÍTICO!' },
+  { pattern: /ESQUIVA/i, icon: '💨', color: '#44ffdd', outlineColor: '#005544', label: m => 'ESQUIVA!' },
+  { pattern: /CONTRA-ATACA/i, icon: '🔄', color: '#ff8800', outlineColor: '#552200', label: () => 'COUNTER!' },
+  { pattern: /ENRAIVECEU/i, icon: '🔴', color: '#ff2200', outlineColor: '#660000', label: () => 'FÚRIA!' },
+  { pattern: /invulnerável/i, icon: '🛡️', color: '#aabbcc', outlineColor: '#334455', label: () => 'INVULN!' },
+  { pattern: /LEVANTOU|ressuscita/i, icon: '✝️', color: '#ffcc00', outlineColor: '#664400', label: () => 'REVIVE!' },
+  { pattern: /Nível (\d+)/i, icon: '⬆', color: '#ffcc00', outlineColor: '#664400', label: m => `LV UP! → ${m[1]}` },
+  { pattern: /MURALHA/i, icon: '🏰', color: '#ccddee', outlineColor: '#334455', label: () => 'MURALHA!' },
+  { pattern: /TRANSFORMAÇÃO/i, icon: '🌟', color: '#ffcc00', outlineColor: '#664400', label: () => 'TRANSFORM!' },
 ];
 
 export function StatusBanners({ log }: { log: CombatLogEntry[] }) {
@@ -178,6 +227,7 @@ export function StatusBanners({ log }: { log: CombatLogEntry[] }) {
               text: sp.label(m),
               icon: sp.icon,
               color: sp.color,
+              outlineColor: sp.outlineColor,
               dying: false,
             });
             break;
@@ -192,8 +242,8 @@ export function StatusBanners({ log }: { log: CombatLogEntry[] }) {
     newBanners.forEach((b, i) => {
       setTimeout(() => {
         setBanners(prev => prev.map(p => p.id === b.id ? { ...p, dying: true } : p));
-        setTimeout(() => setBanners(prev => prev.filter(p => p.id !== b.id)), 500);
-      }, 1600 + i * 200);
+        setTimeout(() => setBanners(prev => prev.filter(p => p.id !== b.id)), 400);
+      }, 1800 + i * 200);
     });
   }, [log]);
 
@@ -206,33 +256,32 @@ export function StatusBanners({ log }: { log: CombatLogEntry[] }) {
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
-      gap: 6,
+      gap: 5,
       zIndex: 600,
       pointerEvents: 'none',
     }}>
-      {banners.map((b, i) => (
+      {banners.map((b) => (
         <div
           key={b.id}
           style={{
             display: 'flex',
             alignItems: 'center',
             gap: 8,
-            padding: '7px 18px',
-            background: `linear-gradient(135deg, rgba(0,0,0,0.9), rgba(10,8,25,0.95))`,
-            border: `1px solid ${b.color}66`,
-            borderRadius: 6,
-            boxShadow: `0 0 20px ${b.color}44, 0 4px 20px rgba(0,0,0,0.8)`,
-            fontFamily: "'Cinzel', serif",
-            fontSize: 13,
-            fontWeight: 700,
+            padding: '6px 18px',
+            background: '#080814',
+            border: `3px solid ${b.color}`,
+            boxShadow: `4px 4px 0 ${b.outlineColor}, 0 0 20px ${b.color}44`,
+            fontFamily: "'Press Start 2P', monospace",
+            fontSize: 11,
+            fontWeight: 900,
             color: b.color,
-            letterSpacing: '0.15em',
-            textShadow: `0 0 16px ${b.color}`,
+            letterSpacing: '0.08em',
+            textShadow: `2px 2px 0 ${b.outlineColor}`,
+            imageRendering: 'pixelated' as any,
             opacity: b.dying ? 0 : 1,
-            transform: b.dying ? 'translateY(-10px) scale(0.9)' : 'translateY(0) scale(1)',
-            transition: 'all 0.4s ease',
-            animation: b.dying ? 'none' : 'slideInUp 0.3s ease',
-            backdropFilter: 'blur(8px)',
+            transform: b.dying ? 'scale(0.8) translateY(-6px)' : 'scale(1) translateY(0)',
+            transition: 'all 0.35s steps(4, end)',
+            animation: b.dying ? 'none' : 'slideInUp 0.2s steps(4, end)',
           }}
         >
           <span style={{ fontSize: 16 }}>{b.icon}</span>
@@ -244,7 +293,7 @@ export function StatusBanners({ log }: { log: CombatLogEntry[] }) {
 }
 
 /* ════════════════════════════════════════════════════
-   COMBAT EVENT HOOK  (card flash/shake triggers)
+   COMBAT EVENT HOOK
    ════════════════════════════════════════════════════ */
 
 export type CombatEventType = 'hit' | 'crit' | 'heal' | 'death' | 'ult' | 'buff';

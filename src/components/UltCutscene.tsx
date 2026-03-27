@@ -14,19 +14,20 @@ export default function UltCutscene({ ult, onComplete }: UltCutsceneProps) {
   const [lineIndex, setLineIndex] = useState(0);
   const [visible, setVisible] = useState(false);
   const [skipped, setSkipped] = useState(false);
+  const [glitchActive, setGlitchActive] = useState(false);
 
   const skip = useCallback(() => {
     if (skipped) return;
     setSkipped(true);
     setVisible(false);
-    setTimeout(onComplete, 300);
+    setTimeout(onComplete, 250);
   }, [skipped, onComplete]);
 
   const isBossUlt = !!(ult as any).isBossUlt;
 
   useEffect(() => {
     setVisible(true);
-    const t1 = setTimeout(() => setPhase('lines'), 600);
+    const t1 = setTimeout(() => setPhase('lines'), 400);
     return () => clearTimeout(t1);
   }, []);
 
@@ -34,18 +35,27 @@ export default function UltCutscene({ ult, onComplete }: UltCutsceneProps) {
     if (skipped) return;
     if (phase !== 'lines') return;
     if (lineIndex < ult.ultLines.length - 1) {
-      const t = setTimeout(() => setLineIndex(i => i + 1), 1100);
+      const t = setTimeout(() => setLineIndex(i => i + 1), 1000);
       return () => clearTimeout(t);
     } else {
-      const t = setTimeout(() => setPhase('name'), 1200);
+      const t = setTimeout(() => setPhase('name'), 1000);
       return () => clearTimeout(t);
     }
   }, [phase, lineIndex, ult.ultLines.length, skipped]);
 
+  // Glitch effect when name appears
+  useEffect(() => {
+    if (phase === 'name') {
+      setGlitchActive(true);
+      const t = setTimeout(() => setGlitchActive(false), 600);
+      return () => clearTimeout(t);
+    }
+  }, [phase]);
+
   useEffect(() => {
     if (skipped) return;
     if (phase !== 'name') return;
-    const t = setTimeout(() => setPhase('flash'), 1400);
+    const t = setTimeout(() => setPhase('flash'), 1200);
     return () => clearTimeout(t);
   }, [phase, skipped]);
 
@@ -54,13 +64,16 @@ export default function UltCutscene({ ult, onComplete }: UltCutsceneProps) {
     if (phase !== 'flash') return;
     const t = setTimeout(() => {
       setVisible(false);
-      setTimeout(onComplete, 500);
-    }, 900);
+      setTimeout(onComplete, 350);
+    }, 700);
     return () => clearTimeout(t);
   }, [phase, onComplete, skipped]);
 
   const cls = !isBossUlt ? CLASSES[ult.classType] : null;
   const bossName = (ult as any).bossName ?? ult.playerName;
+
+  // Generate pixel particles
+  const particles = Array.from({ length: isBossUlt ? 24 : 16 });
 
   return (
     <div
@@ -74,99 +87,124 @@ export default function UltCutscene({ ult, onComplete }: UltCutsceneProps) {
         justifyContent: 'center',
         background: ult.ultBg,
         opacity: visible ? 1 : 0,
-        transition: 'opacity 0.5s ease',
+        transition: 'opacity 0.3s steps(4, end)',
         overflow: 'hidden',
         flexDirection: 'column',
         gap: 0,
         cursor: 'pointer',
+        imageRendering: 'pixelated',
+        fontFamily: "'Press Start 2P', monospace",
       }}
     >
+      {/* Pixel scanlines overlay */}
+      <div style={{
+        position: 'absolute',
+        inset: 0,
+        background: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.12) 2px, rgba(0,0,0,0.12) 4px)',
+        pointerEvents: 'none',
+        zIndex: 2,
+      }} />
+
+      {/* Pixel grid */}
+      <div style={{
+        position: 'absolute',
+        inset: 0,
+        backgroundImage: `linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px)`,
+        backgroundSize: '32px 32px',
+        pointerEvents: 'none',
+        zIndex: 1,
+      }} />
+
+      {/* Pixel particles */}
+      <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: 3 }}>
+        {particles.map((_, i) => {
+          const size = 4 + (i % 3) * 4;
+          const x = 5 + (i * 37) % 90;
+          const y = 5 + (i * 53) % 90;
+          return (
+            <div
+              key={i}
+              style={{
+                position: 'absolute',
+                top: `${y}%`,
+                left: `${x}%`,
+                width: size,
+                height: size,
+                background: ult.ultColor,
+                opacity: (phase === 'lines' || phase === 'name') ? 0.6 + (i % 4) * 0.1 : 0,
+                transition: `opacity ${0.2 + (i % 3) * 0.15}s steps(2, end)`,
+                imageRendering: 'pixelated',
+              }}
+            />
+          );
+        })}
+
+        {/* Pixel border rings */}
+        {[1,2,3].map(i => (
+          <div key={`ring-${i}`} style={{
+            position: 'absolute',
+            top: '50%', left: '50%',
+            width: i * 160,
+            height: i * 160,
+            marginLeft: -i * 80,
+            marginTop: -i * 80,
+            border: `4px solid ${ult.ultColor}`,
+            opacity: phase === 'name' || phase === 'flash' ? (isBossUlt ? 0.5 : 0.3) : 0,
+            transform: phase === 'flash' ? `scale(${1.5 + i * 0.3})` : 'scale(1)',
+            transition: `all ${0.4 + i * 0.1}s steps(4, end)`,
+            imageRendering: 'pixelated',
+          }} />
+        ))}
+      </div>
+
       {/* Skip hint */}
       <div style={{
         position: 'absolute',
-        bottom: 28,
-        right: 32,
-        fontFamily: '"Cinzel", serif',
-        fontSize: 13,
-        color: 'rgba(255,255,255,0.45)',
-        letterSpacing: '0.15em',
+        bottom: 24,
+        right: 28,
+        fontFamily: "'Press Start 2P', monospace",
+        fontSize: 8,
+        color: 'rgba(255,255,255,0.3)',
+        letterSpacing: '0.08em',
         zIndex: 10,
         pointerEvents: 'none',
-        animation: 'ultPulse 1.5s ease-in-out infinite alternate',
+        animation: 'pixelBlink 1.2s step-end infinite',
       }}>
-        CLIQUE PARA PULAR ▶
+        [CLICK] SKIP ▶
       </div>
 
-      {/* Animated bg rings */}
-      <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>
-        {[1,2,3,4].map(i => (
-          <div key={i} style={{
-            position: 'absolute',
-            top: '50%', left: '50%',
-            width: `${i * 200}px`, height: `${i * 200}px`,
-            marginLeft: `${-i * 100}px`, marginTop: `${-i * 100}px`,
-            borderRadius: '50%',
-            border: `${isBossUlt ? 2 : 1}px solid ${ult.ultColor}`,
-            opacity: phase === 'name' || phase === 'flash' ? (isBossUlt ? 0.5 : 0.3) : 0,
-            transform: phase === 'flash' ? `scale(${1 + i * 0.3})` : 'scale(1)',
-            transition: `all ${0.6 + i * 0.15}s ease`,
-          }} />
-        ))}
-        {Array.from({ length: isBossUlt ? 30 : 20 }).map((_, i) => (
-          <div key={i} style={{
-            position: 'absolute',
-            top: `${10 + Math.random() * 80}%`,
-            left: `${5 + Math.random() * 90}%`,
-            width: `${(isBossUlt ? 3 : 2) + Math.random() * 4}px`,
-            height: `${(isBossUlt ? 3 : 2) + Math.random() * 4}px`,
-            borderRadius: '50%',
-            background: ult.ultColor,
-            opacity: (phase === 'lines' || phase === 'name') ? 0.6 + Math.random() * 0.4 : 0,
-            transition: `opacity ${0.3 + Math.random() * 0.5}s ease`,
-            boxShadow: `0 0 ${isBossUlt ? 12 : 8}px ${ult.ultColor}`,
-          }} />
-        ))}
-        {isBossUlt && (phase === 'name' || phase === 'flash') && Array.from({ length: 8 }).map((_, i) => (
-          <div key={`crack-${i}`} style={{
-            position: 'absolute',
-            top: '50%', left: '50%',
-            width: `${150 + Math.random() * 300}px`,
-            height: '2px',
-            background: `linear-gradient(to right, ${ult.ultColor}, transparent)`,
-            transform: `rotate(${i * 45 + Math.random() * 20}deg) translateX(${30 + Math.random() * 50}px)`,
-            opacity: phase === 'flash' ? 0 : 0.8,
-            transition: 'opacity 0.3s ease',
-          }} />
-        ))}
-      </div>
-
-      {/* Top bar */}
+      {/* Top bar — pixel dialog style */}
       <div style={{
         position: 'absolute', top: 0, left: 0, right: 0,
-        padding: '20px 32px',
-        display: 'flex', alignItems: 'center', gap: 14,
-        background: 'linear-gradient(to bottom, rgba(0,0,0,0.8), transparent)',
+        padding: '14px 24px',
+        display: 'flex', alignItems: 'center', gap: 12,
+        background: 'rgba(0,0,0,0.7)',
+        borderBottom: `3px solid ${ult.ultColor}44`,
         opacity: phase === 'intro' ? 0 : 1,
-        transform: phase === 'intro' ? 'translateY(-20px)' : 'translateY(0)',
-        transition: 'all 0.5s ease',
+        transform: phase === 'intro' ? 'translateY(-14px)' : 'translateY(0)',
+        transition: 'all 0.3s steps(4, end)',
+        zIndex: 5,
+        boxShadow: `0 4px 0 rgba(0,0,0,0.6)`,
       }}>
-        <span style={{ fontSize: isBossUlt ? 40 : 32 }}>{ult.ultEmoji}</span>
+        <span style={{ fontSize: isBossUlt ? 36 : 28, filter: `drop-shadow(2px 2px 0 ${ult.ultColor}66)` }}>
+          {ult.ultEmoji}
+        </span>
         <div>
           {isBossUlt ? (
             <>
-              <div style={{ fontFamily: '"Cinzel", serif', fontSize: 11, color: '#e74c3c', letterSpacing: '0.3em', textTransform: 'uppercase', marginBottom: 2 }}>
-                ⚠️ BOSS ULTIMATE
+              <div style={{ fontFamily: "'Press Start 2P', monospace", fontSize: 8, color: '#ff4444', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 3, textShadow: '2px 2px 0 #660000' }}>
+                ⚠ BOSS ULTIMATE ⚠
               </div>
-              <div style={{ fontFamily: '"Cinzel", serif', fontSize: 20, color: '#fff', letterSpacing: '0.1em' }}>
+              <div style={{ fontFamily: "'Press Start 2P', monospace", fontSize: 13, color: '#fff', letterSpacing: '0.06em', textShadow: '2px 2px 0 rgba(0,0,0,0.8)' }}>
                 {bossName}
               </div>
             </>
           ) : (
             <>
-              <div style={{ fontFamily: '"Cinzel", serif', fontSize: 13, color: ult.ultColor, letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 2 }}>
-                {cls?.name}
+              <div style={{ fontFamily: "'Press Start 2P', monospace", fontSize: 8, color: ult.ultColor, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 3 }}>
+                {cls?.name} — ULTIMATE
               </div>
-              <div style={{ fontFamily: '"Cinzel", serif', fontSize: 18, color: '#fff', letterSpacing: '0.1em' }}>
+              <div style={{ fontFamily: "'Press Start 2P', monospace", fontSize: 11, color: '#fff', letterSpacing: '0.06em', textShadow: '2px 2px 0 rgba(0,0,0,0.8)' }}>
                 {ult.playerName}
               </div>
             </>
@@ -174,98 +212,138 @@ export default function UltCutscene({ ult, onComplete }: UltCutsceneProps) {
         </div>
         <div style={{
           marginLeft: 'auto',
-          fontFamily: '"Cinzel", serif', fontSize: 12,
-          color: ult.ultColor, letterSpacing: '0.3em', textTransform: 'uppercase', opacity: 0.8,
+          fontFamily: "'Press Start 2P', monospace",
+          fontSize: 8,
+          color: ult.ultColor,
+          letterSpacing: '0.12em',
+          opacity: 0.7,
+          textShadow: '1px 1px 0 rgba(0,0,0,0.8)',
         }}>
-          {isBossUlt ? '💀 ULTIMATE' : 'ULTIMATE'}
+          {isBossUlt ? '[ DANGER ]' : '[ LIMIT BREAK ]'}
         </div>
       </div>
 
       {/* Center content */}
       <div style={{
-        display: 'flex', flexDirection: 'column', alignItems: 'center',
-        gap: 32, padding: '0 40px', textAlign: 'center',
-        position: 'relative', zIndex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 28,
+        padding: '0 40px',
+        textAlign: 'center',
+        position: 'relative',
+        zIndex: 4,
+        marginTop: 40,
       }}>
+        {/* Main emoji */}
         <div style={{
-          fontSize: phase === 'name' || phase === 'flash' ? (isBossUlt ? '140px' : '120px') : (isBossUlt ? '100px' : '80px'),
-          filter: `drop-shadow(0 0 ${isBossUlt ? 60 : 40}px ${ult.ultColor}) drop-shadow(0 0 ${isBossUlt ? 100 : 80}px ${ult.ultColor})`,
-          transition: 'all 0.6s ease',
+          fontSize: phase === 'name' || phase === 'flash'
+            ? (isBossUlt ? 110 : 96)
+            : (isBossUlt ? 80 : 68),
+          filter: `drop-shadow(4px 4px 0 ${ult.ultColor}88) drop-shadow(0 0 ${isBossUlt ? 40 : 30}px ${ult.ultColor})`,
+          transition: 'all 0.4s steps(4, end)',
           opacity: phase === 'intro' ? 0 : 1,
-          transform: phase === 'flash' ? 'scale(1.4)' : phase === 'name' ? 'scale(1.15)' : 'scale(1)',
+          transform: phase === 'flash' ? 'scale(1.3)' : phase === 'name' ? 'scale(1.1)' : 'scale(1)',
+          imageRendering: 'pixelated',
+          animation: glitchActive ? 'pixelGlitch 0.4s steps(3, end)' : 'none',
         }}>
           {ult.ultEmoji}
         </div>
 
-        <div style={{ minHeight: 80, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+        {/* Dialog lines — pixel style */}
+        <div style={{
+          minHeight: 90,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 10,
+        }}>
           {phase === 'lines' && ult.ultLines.map((line, i) => (
             <div key={i} style={{
-              fontFamily: '"Cinzel", serif',
-              fontSize: `clamp(${isBossUlt ? 16 : 14}px, 2.5vw, ${isBossUlt ? 24 : 20}px)`,
-              color: i === lineIndex ? (isBossUlt ? '#ff6b6b' : '#fff') : 'rgba(255,255,255,0.35)',
-              letterSpacing: '0.12em',
+              fontFamily: "'Press Start 2P', monospace",
+              fontSize: `clamp(${isBossUlt ? 11 : 9}px, 1.8vw, ${isBossUlt ? 16 : 14}px)`,
+              color: i === lineIndex ? (isBossUlt ? '#ff8888' : '#ffffff') : 'rgba(255,255,255,0.25)',
+              letterSpacing: '0.06em',
               opacity: i <= lineIndex ? 1 : 0,
-              transform: i <= lineIndex ? 'translateY(0)' : 'translateY(15px)',
-              transition: 'all 0.4s ease',
-              textShadow: i === lineIndex ? `0 0 30px ${ult.ultColor}` : 'none',
-              fontStyle: 'italic',
+              transform: i <= lineIndex ? 'translateY(0)' : 'translateY(10px)',
+              transition: 'all 0.25s steps(3, end)',
+              textShadow: i === lineIndex ? `2px 2px 0 ${ult.ultColor}88` : 'none',
+              padding: '2px 0',
+              borderBottom: i === lineIndex ? `2px solid ${ult.ultColor}44` : 'none',
             }}>
+              {i === lineIndex && <span style={{ marginRight: 8, animation: 'pixelBlink 0.5s step-end infinite', color: ult.ultColor }}>▶</span>}
               {line}
             </div>
           ))}
         </div>
 
+        {/* ULT name — big pixel impact */}
         {(phase === 'name' || phase === 'flash') && (
           <div style={{
-            fontFamily: '"Cinzel", serif',
-            fontSize: `clamp(${isBossUlt ? 32 : 28}px, 6vw, ${isBossUlt ? 72 : 64}px)`,
+            fontFamily: "'Press Start 2P', monospace",
+            fontSize: `clamp(${isBossUlt ? 18 : 15}px, 4vw, ${isBossUlt ? 42 : 36}px)`,
             fontWeight: 900,
             color: ult.ultColor,
-            letterSpacing: '0.2em',
+            letterSpacing: '0.1em',
             textTransform: 'uppercase',
-            textShadow: `0 0 60px ${ult.ultColor}, 0 0 120px ${ult.ultColor}${isBossUlt ? `, 0 0 200px ${ult.ultColor}` : ''}`,
-            animation: 'ultPulse 0.5s ease-in-out infinite alternate',
+            textShadow: `4px 4px 0 ${ult.ultColor.replace(')', ', 0.5)').replace('rgb', 'rgba').replace('#', '').slice(0, -1) || '000000'}, 3px 3px 0 rgba(0,0,0,0.8), 0 0 30px ${ult.ultColor}`,
+            animation: phase === 'flash' ? 'none' : 'ultPixelPulse 0.4s steps(3, end) infinite alternate',
             opacity: phase === 'flash' ? 0 : 1,
-            transition: 'opacity 0.4s ease',
-            lineHeight: 1.1,
+            transition: 'opacity 0.3s steps(3, end)',
+            lineHeight: 1.2,
+            filter: glitchActive ? `hue-rotate(${Math.random() * 180}deg)` : 'none',
           }}>
-            {isBossUlt && <span style={{ fontSize: '60%', display: 'block', marginBottom: 4 }}>⚠️</span>}
+            {isBossUlt && (
+              <div style={{ fontSize: '55%', marginBottom: 6, color: '#ff4444', textShadow: '2px 2px 0 #660000' }}>⚠ WARNING ⚠</div>
+            )}
             {ult.ultName}
           </div>
         )}
 
+        {/* Flash screen */}
         {phase === 'flash' && (
           <div style={{
-            position: 'fixed', inset: 0,
-            background: `radial-gradient(ellipse at center, ${ult.ultColor}${isBossUlt ? '99' : '66'} 0%, transparent 70%)`,
-            animation: 'ultFlash 0.8s ease-out forwards',
+            position: 'fixed',
+            inset: 0,
+            background: ult.ultColor,
+            animation: 'pixelFlash 0.6s steps(4, end) forwards',
             pointerEvents: 'none',
+            zIndex: 8,
           }} />
         )}
       </div>
 
+      {/* Bottom accent bar */}
       <div style={{
-        position: 'absolute', bottom: 0, left: 0, right: 0, height: isBossUlt ? 5 : 3,
-        background: `linear-gradient(to right, transparent, ${ult.ultColor}, transparent)`,
+        position: 'absolute', bottom: 0, left: 0, right: 0,
+        height: isBossUlt ? 6 : 4,
+        background: `repeating-linear-gradient(90deg, ${ult.ultColor} 0px, ${ult.ultColor} 8px, transparent 8px, transparent 16px)`,
         opacity: phase !== 'intro' ? 1 : 0,
-        transition: 'opacity 0.5s ease',
-      }} />
-
-      <div style={{
-        position: 'absolute', inset: 0, pointerEvents: 'none',
-        backgroundImage: 'repeating-linear-gradient(0deg, rgba(0,0,0,0.03) 0px, rgba(0,0,0,0.03) 1px, transparent 1px, transparent 2px)',
-        zIndex: 2,
+        transition: 'opacity 0.3s steps(2, end)',
+        zIndex: 5,
       }} />
 
       <style>{`
-        @keyframes ultPulse {
-          from { letter-spacing: 0.2em; }
-          to { letter-spacing: 0.28em; text-shadow: 0 0 80px ${ult.ultColor}, 0 0 160px ${ult.ultColor}; }
+        @keyframes pixelBlink {
+          0%, 49% { opacity: 1; }
+          50%, 100% { opacity: 0; }
         }
-        @keyframes ultFlash {
-          0% { opacity: 0; }
-          30% { opacity: 1; }
+        @keyframes pixelFlash {
+          0%   { opacity: 0; }
+          20%  { opacity: 0.9; }
+          50%  { opacity: 0.6; }
           100% { opacity: 0; }
+        }
+        @keyframes ultPixelPulse {
+          from { letter-spacing: 0.08em; }
+          to   { letter-spacing: 0.14em; }
+        }
+        @keyframes pixelGlitch {
+          0%   { transform: scale(1) translate(0,0); filter: hue-rotate(0deg); }
+          25%  { transform: scale(1.05) translate(-4px,2px); filter: hue-rotate(90deg) saturate(2); }
+          50%  { transform: scale(0.98) translate(4px,-2px); filter: hue-rotate(-90deg) saturate(2); }
+          75%  { transform: scale(1.02) translate(-2px,-2px); filter: hue-rotate(45deg); }
+          100% { transform: scale(1) translate(0,0); filter: hue-rotate(0deg); }
         }
       `}</style>
     </div>

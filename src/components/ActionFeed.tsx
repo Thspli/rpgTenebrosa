@@ -11,41 +11,59 @@ interface FeedEntry extends CombatLogEntry {
   visible: boolean;
 }
 
-const TYPE_CONFIG: Record<string, { icon: string; color: string; bg: string; border: string; glow: string }> = {
-  player_action:  {
+const TYPE_CONFIG: Record<string, {
+  icon: string;
+  color: string;
+  bg: string;
+  border: string;
+  glow: string;
+  labelColor: string;
+  label: string;
+}> = {
+  player_action: {
     icon: '⚔️',
-    color: '#a8d8ea',
-    bg: 'linear-gradient(135deg, rgba(168,216,234,0.06), rgba(52,152,219,0.04))',
-    border: 'rgba(168,216,234,0.2)',
+    color: '#6699ff',
+    bg: 'linear-gradient(135deg, rgba(30,40,100,0.7), rgba(20,30,80,0.5))',
+    border: '#2244aa',
     glow: 'none',
+    labelColor: '#4466cc',
+    label: 'ACTION',
   },
   monster_action: {
     icon: '👹',
-    color: '#f4a261',
-    bg: 'linear-gradient(135deg, rgba(244,162,97,0.07), rgba(192,57,43,0.04))',
-    border: 'rgba(244,162,97,0.22)',
+    color: '#ff7744',
+    bg: 'linear-gradient(135deg, rgba(100,30,10,0.7), rgba(80,20,5,0.5))',
+    border: '#aa3300',
     glow: 'none',
+    labelColor: '#882200',
+    label: 'ENEMY',
   },
   system: {
     icon: '📜',
-    color: '#6a6a8a',
-    bg: 'rgba(30,30,60,0.4)',
-    border: 'rgba(80,80,120,0.15)',
+    color: '#6666aa',
+    bg: 'rgba(20,20,40,0.6)',
+    border: '#333366',
     glow: 'none',
+    labelColor: '#444466',
+    label: 'SYS',
   },
   level_up: {
-    icon: '✨',
-    color: '#f0c040',
-    bg: 'linear-gradient(135deg, rgba(240,192,64,0.1), rgba(212,160,23,0.06))',
-    border: 'rgba(240,192,64,0.45)',
-    glow: '0 0 12px rgba(240,192,64,0.3)',
+    icon: '⬆',
+    color: '#ffcc00',
+    bg: 'linear-gradient(135deg, rgba(100,70,0,0.7), rgba(60,40,0,0.5))',
+    border: '#cc8800',
+    glow: '3px 3px 0 #553300, 0 0 12px rgba(255,200,0,0.4)',
+    labelColor: '#aa7700',
+    label: 'LEVEL',
   },
   death: {
     icon: '💀',
-    color: '#e74c3c',
-    bg: 'linear-gradient(135deg, rgba(231,76,60,0.1), rgba(139,0,0,0.08))',
-    border: 'rgba(231,76,60,0.4)',
-    glow: '0 0 12px rgba(231,76,60,0.3)',
+    color: '#ff4444',
+    bg: 'linear-gradient(135deg, rgba(100,0,0,0.7), rgba(60,0,0,0.5))',
+    border: '#880000',
+    glow: '3px 3px 0 #440000, 0 0 12px rgba(255,0,0,0.3)',
+    labelColor: '#660000',
+    label: 'DEFEAT',
   },
 };
 
@@ -61,7 +79,7 @@ export default function ActionFeed({ log }: ActionFeedProps) {
 
     setEntries(prev => {
       const added = newOnes.map(e => ({ ...e, visible: false }));
-      return [...prev, ...added].slice(-20);
+      return [...prev, ...added].slice(-18);
     });
 
     newOnes.forEach((_, i) => {
@@ -73,7 +91,7 @@ export default function ActionFeed({ log }: ActionFeedProps) {
           copy[idx] = { ...copy[idx], visible: true };
           return copy;
         });
-      }, i * 70);
+      }, i * 60);
     });
   }, [log]);
 
@@ -83,37 +101,47 @@ export default function ActionFeed({ log }: ActionFeedProps) {
     }
   }, [entries]);
 
-  const visible = entries.slice(-14);
+  const visible = entries.slice(-12);
 
   return (
     <div style={{
       position: 'fixed',
-      right: 12,
+      right: 10,
       top: '50%',
       transform: 'translateY(-50%)',
-      width: 270,
-      maxHeight: '58vh',
+      width: 260,
+      maxHeight: '54vh',
       display: 'flex',
       flexDirection: 'column',
       pointerEvents: 'none',
       zIndex: 100,
+      imageRendering: 'pixelated',
     }}>
-      {/* Header */}
+      {/* Header — pixel style */}
       <div style={{
-        fontFamily: "'Cinzel', serif",
-        fontSize: 9,
-        letterSpacing: '0.22em',
-        color: 'rgba(160,160,200,0.5)',
+        fontFamily: "'Press Start 2P', monospace",
+        fontSize: 7,
+        letterSpacing: '0.12em',
+        color: 'rgba(100,100,180,0.55)',
         textTransform: 'uppercase',
-        padding: '0 2px 6px',
-        borderBottom: '1px solid rgba(80,80,130,0.2)',
-        marginBottom: 6,
+        padding: '0 2px 5px',
+        borderBottom: '2px solid #1e1e42',
+        marginBottom: 5,
         display: 'flex',
         alignItems: 'center',
-        gap: 6,
+        gap: 5,
+        textShadow: '1px 1px 0 rgba(0,0,0,0.8)',
       }}>
-        <span style={{ width: 4, height: 4, borderRadius: '50%', background: 'rgba(212,160,23,0.6)', display: 'inline-block', animation: 'pulse 1.5s ease-in-out infinite' }} />
-        Registro de Ações
+        {/* Pixel blinking dot */}
+        <span style={{
+          width: 6, height: 6,
+          background: '#ffcc00',
+          boxShadow: '0 0 6px rgba(255,200,0,0.6)',
+          display: 'inline-block',
+          animation: 'pixelBlink 1s step-end infinite',
+          imageRendering: 'pixelated',
+        }} />
+        BATTLE LOG
       </div>
 
       <div
@@ -121,72 +149,98 @@ export default function ActionFeed({ log }: ActionFeedProps) {
         style={{
           display: 'flex',
           flexDirection: 'column',
-          gap: 3,
+          gap: 2,
           overflowY: 'auto',
           scrollbarWidth: 'none',
         }}
       >
         {visible.map((entry, i) => {
           const cfg = TYPE_CONFIG[entry.type] ?? TYPE_CONFIG.system;
-          const age = i / visible.length; // 0 = oldest, 1 = newest
-          const opacity = 0.28 + age * 0.72;
+          const age = i / visible.length;
+          const opacity = 0.22 + age * 0.78;
+          const isNewest = i === visible.length - 1;
 
           return (
             <div
               key={entry.id}
               style={{
                 background: cfg.bg,
-                border: `1px solid ${cfg.border}`,
-                borderRadius: 5,
-                padding: '5px 9px',
+                border: `2px solid ${cfg.border}`,
+                padding: '4px 7px',
                 display: 'flex',
                 alignItems: 'flex-start',
-                gap: 7,
+                gap: 5,
                 opacity: entry.visible ? opacity : 0,
-                transform: entry.visible ? 'translateX(0)' : 'translateX(32px)',
-                transition: 'all 0.3s cubic-bezier(0.175,0.885,0.32,1)',
-                backdropFilter: 'blur(6px)',
-                boxShadow: cfg.glow,
+                transform: entry.visible
+                  ? 'translateX(0)'
+                  : 'translateX(28px)',
+                transition: 'all 0.25s steps(6, end)',
+                boxShadow: isNewest ? cfg.glow : 'none',
                 pointerEvents: 'auto',
                 position: 'relative',
                 overflow: 'hidden',
+                imageRendering: 'pixelated',
               }}
             >
-              {/* Shimmer for latest entries */}
-              {i === visible.length - 1 && (
+              {/* Newest entry highlight */}
+              {isNewest && (
                 <div style={{
                   position: 'absolute',
-                  inset: 0,
-                  background: `linear-gradient(90deg, transparent, ${cfg.color}10, transparent)`,
-                  backgroundSize: '200% 100%',
-                  animation: 'shimmer 1.5s ease forwards',
-                  pointerEvents: 'none',
+                  left: 0, top: 0, bottom: 0,
+                  width: 3,
+                  background: cfg.color,
+                  animation: 'pixelBlink 0.5s step-end 3',
                 }} />
               )}
-              <span style={{ fontSize: 11, flexShrink: 0, marginTop: 1 }}>{cfg.icon}</span>
-              <div style={{ flex: 1, minWidth: 0 }}>
+
+              {/* Icon + label column */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, flexShrink: 0, marginTop: 1 }}>
+                <span style={{ fontSize: 10 }}>{cfg.icon}</span>
                 <span style={{
-                  fontFamily: "'IM Fell English', serif",
-                  fontSize: 12,
-                  color: cfg.color,
-                  lineHeight: 1.4,
-                  display: 'block',
+                  fontFamily: "'Press Start 2P', monospace",
+                  fontSize: 4,
+                  color: cfg.labelColor,
+                  letterSpacing: '0.06em',
+                  textShadow: '1px 1px 0 rgba(0,0,0,0.8)',
                 }}>
-                  {entry.message}
+                  {cfg.label}
                 </span>
-                <span style={{
-                  fontFamily: "'Cinzel', serif",
-                  fontSize: 8,
-                  color: 'rgba(120,120,160,0.5)',
-                  letterSpacing: '0.1em',
+              </div>
+
+              <div style={{ flex: 1, minWidth: 0 }}>
+                {/* Turn indicator */}
+                <div style={{
+                  fontFamily: "'Press Start 2P', monospace",
+                  fontSize: 5,
+                  color: 'rgba(80,80,140,0.5)',
+                  letterSpacing: '0.06em',
+                  marginBottom: 1,
                 }}>
                   T{entry.turn}
+                </div>
+                {/* Message */}
+                <span style={{
+                  fontFamily: "'VT323', monospace",
+                  fontSize: 15,
+                  color: cfg.color,
+                  lineHeight: 1.3,
+                  display: 'block',
+                  wordBreak: 'break-word',
+                }}>
+                  {entry.message}
                 </span>
               </div>
             </div>
           );
         })}
       </div>
+
+      <style>{`
+        @keyframes pixelBlink {
+          0%, 49% { opacity: 1; }
+          50%, 100% { opacity: 0; }
+        }
+      `}</style>
     </div>
   );
 }
