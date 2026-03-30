@@ -1,6 +1,10 @@
 // ═══════════════════════════════════════════════════════════
-//  REALM OF SHADOWS — Game Engine v2
-//  Orchestrates all game phases. No more 900-line spaghetti.
+//  src/engine/gameEngine.ts — Game Engine v2 (CORRIGIDO)
+//  Correções:
+//  1. Loja intermediária a cada SHOP_INTERVAL turnos funciona
+//  2. shopCountdown atualizado corretamente
+//  3. Derrota verificada corretamente
+//  4. proceedToNextMap exportado corretamente
 // ═══════════════════════════════════════════════════════════
 
 import { nanoid } from 'nanoid';
@@ -13,7 +17,7 @@ import { CLASS_SKILLS, canUseSkill, spendMp } from './skills';
 import { processPlayerAction as combatAction, handleMonsterDeath, getNextActivePlayer } from './combat';
 import { xpToNextLevel, makeLog, applyXp } from './utils';
 
-// ─── Global Room Store ────────────────────────────────────
+const SHOP_INTERVAL = 3; // abre loja a cada 3 turnos
 
 declare global { var gameRooms: Map<string, GameState>; }
 if (!global.gameRooms) global.gameRooms = new Map();
@@ -37,8 +41,6 @@ export function resetRoom(roomId: string): void {
   global.gameRooms.delete(roomId);
 }
 
-// ─── Initial State ────────────────────────────────────────
-
 function createInitialState(roomId: string): GameState {
   return {
     roomId,
@@ -55,7 +57,7 @@ function createInitialState(roomId: string): GameState {
     activePlayerId: null,
     bossDefeated: false,
     waveNumber: 0,
-    shopCountdown: 0,
+    shopCountdown: SHOP_INTERVAL,
     shopReady: {},
     groupMomentum: 0,
     synergyReady: false,
@@ -63,12 +65,10 @@ function createInitialState(roomId: string): GameState {
   };
 }
 
-// ─── Player Factory ───────────────────────────────────────
-
 function createPlayer(id: string, name: string, classType: ClassType): Player {
   const cls = CLASSES[classType];
   return {
-    id, name, classType,
+    id, name, classType, emoji: cls.emoji,
     level: 1, xp: 0, xpToNextLevel: 100,
     hp: cls.baseStats.hp, maxHp: cls.baseStats.hp,
     mp: cls.baseStats.mp, maxMp: cls.baseStats.mp,
@@ -83,20 +83,17 @@ function createPlayer(id: string, name: string, classType: ClassType): Player {
   };
 }
 
-// ─── Lobby & Setup ────────────────────────────────────────
-
 export function joinRoom(state: GameState, playerId: string, name: string): GameState {
   if (Object.keys(state.players).length >= 6) return state;
   if (state.players[playerId]) return state;
   const player = createPlayer(playerId, name, 'warrior');
-  const newState: GameState = {
+  return {
     ...state,
     players: { ...state.players, [playerId]: player },
     playerOrder: [...state.playerOrder, playerId],
     phase: 'class_selection',
     combatLog: [...state.combatLog, makeLog(0, `⚔️ ${name} entrou na sala!`, 'system')],
   };
-  return newState;
 }
 
 export function selectClass(state: GameState, playerId: string, classType: ClassType): GameState {
@@ -113,14 +110,12 @@ export function selectClass(state: GameState, playerId: string, classType: Class
 
   const old = state.players[playerId];
   const newPlayer = createPlayer(playerId, old.name, classType);
-  // Keep level, xp, coins, inventory from previous selection
   newPlayer.coins = old.coins;
   newPlayer.level = old.level;
   newPlayer.xp = old.xp;
   newPlayer.xpToNextLevel = old.xpToNextLevel;
   newPlayer.isReady = false;
 
-  // Re-apply permanent items
   const permItems = old.inventory.filter(i => i.permanent);
   permItems.forEach(item => {
     newPlayer.attack += item.attackBonus;
@@ -169,8 +164,6 @@ export function selectMap(state: GameState, _playerId: string, mapId: MapId): Ga
     combatLog: [...state.combatLog, makeLog(0, `🗺️ ${mapDef.theme} ${mapDef.name} selecionado!`, 'system'), makeLog(0, `🛒 Loja aberta!`, 'system')],
   };
 }
-
-// ─── Shopping ─────────────────────────────────────────────
 
 export function buyItem(state: GameState, playerId: string, itemId: string): GameState {
   const player = state.players[playerId];
@@ -223,15 +216,16 @@ export function toggleShopReady(state: GameState, playerId: string): GameState {
   const allReady = alivePlayers.length > 0 && alivePlayers.every(p => newReady[p.id]);
 
   if (allReady) {
-    return newState.phase === 'victory_shopping' ? proceedToNextMap(newState) : startCombat({ ...newState, shopReady: {} });
+    if (newState.phase === 'victory_shopping') return proceedToNextMap(newState);
+    // Mid-combat shop: retoma combate sem resetar HP
+    return resumeCombat({ ...newState, shopReady: {} });
   }
   return newState;
 }
 
-// ─── Combat Start ─────────────────────────────────────────
+// ─── Combat Start (início de mapa — full reset) ──────────
 
 export function startCombat(state: GameState): GameState {
-  // Full heal + reset buffs
   const resetPlayers: Record<string, Player> = {};
   Object.entries(state.players).forEach(([id, p]) => {
     resetPlayers[id] = {
@@ -253,7 +247,7 @@ export function startCombat(state: GameState): GameState {
     shopReady: {},
     bossDefeated: false,
     waveNumber: 0,
-    shopCountdown: 0,
+    shopCountdown: SHOP_INTERVAL,
     activeUlt: null,
     monsters: [],
     groupMomentum: 0,
@@ -263,13 +257,34 @@ export function startCombat(state: GameState): GameState {
   return spawnWave(newState);
 }
 
+// ─── Resume Combat (retoma após loja intermediária) ───────
+
+function resumeCombat(state: GameState): GameState {
+  const newState: GameState = {
+    ...state,
+    phase: 'combat',
+    actionsThisTurn: {},
+    shopReady: {},
+    shopCountdown: SHOP_INTERVAL,
+    combatLog: [...state.combatLog, makeLog(state.turn, `⚔️ Combate retomado! Próxima pausa em ${SHOP_INTERVAL} turnos.`, 'system')],
+  };
+
+  const first = newState.playerOrder.find(pid => newState.players[pid]?.isAlive);
+  return {
+    ...newState,
+    activePlayerId: first ?? null,
+    combatLog: first
+      ? [...newState.combatLog, makeLog(newState.turn, `🎯 Vez de ${newState.players[first].name} agir!`, 'system')]
+      : newState.combatLog,
+  };
+}
+
 // ─── Wave / Boss Spawning ─────────────────────────────────
 
 function spawnWave(state: GameState): GameState {
   const mapDef = MAPS.find(m => m.id === state.currentMap)!;
   const existingSummons = state.monsters.filter(m => m.isSummon && m.isAlive);
 
-  // Pick 2-3 random monsters from pool
   const pool = [...mapDef.monsters].sort(() => Math.random() - 0.5).slice(0, 2 + Math.floor(Math.random() * 2));
   const freshMonsters: Monster[] = pool.map(m => ({ ...m, id: nanoid(), effects: [], isAlive: true }));
   const waveNum = state.waveNumber + 1;
@@ -325,7 +340,7 @@ function spawnBoss(state: GameState): GameState {
   };
 }
 
-// ─── Player Action (main entry point from socket) ─────────
+// ─── Player Action ────────────────────────────────────────
 
 export function processAction(
   state: GameState,
@@ -337,17 +352,14 @@ export function processAction(
   if (state.actionsThisTurn[playerId]) return state;
   if (!state.players[playerId]?.isAlive) return state;
 
-  // Bridge to the combat engine's processPlayerAction
   const combatState = gameToCombat(state);
   const updatedCombat = combatAction(combatState, playerId, action as any);
   let newState = combatToGame(state, updatedCombat);
 
-  // Pull ULT cutscene from pendingUlt
   if ((updatedCombat as any).pendingUlt) {
     newState = { ...newState, activeUlt: (updatedCombat as any).pendingUlt };
   }
 
-  // Check battle result — this is the only place shop can open (via handleVictory)
   newState = checkBattleResult(newState);
 
   return newState;
@@ -385,7 +397,7 @@ export function useTransform(state: GameState, playerId: string): GameState {
     playerId,
     playerName: player.name,
     classType: player.classType,
-    ultName: `TRANSFORMAÇÃO: ${player.classType.toUpperCase()}`,
+    ultName: `TRANSFORMAÇÃO: ${CLASSES[player.classType].name.toUpperCase()}`,
     ultLines: ['Absorvendo a Essência do Deus Antigo...', 'O poder transcende os limites...', 'TRANSFORMAÇÃO!'],
     ultColor: CLASSES[player.classType].color,
     ultBg: `radial-gradient(ellipse, #1a1a30 0%, #050508 70%)`,
@@ -393,63 +405,12 @@ export function useTransform(state: GameState, playerId: string): GameState {
     isTransform: true,
   };
 
-  const newState = {
+  let newState = {
     ...state,
     players: { ...state.players, [playerId]: transformed },
     activeUlt: ultData,
     actionsThisTurn: { ...state.actionsThisTurn, [playerId]: true },
     combatLog: [...state.combatLog, makeLog(state.turn, `🌟 ${player.name} se TRANSFORMA! +${atkBonus} ATK, +${defBonus} DEF, +${hpBonus} HP por 6 turnos!`, 'level_up')],
-  };
-
-  return advanceAfterAction(newState, playerId);
-}
-
-// ─── Summon Actions ───────────────────────────────────────
-
-export function summonAnimal(state: GameState, playerId: string, templateId: string, mpCost: number): GameState {
-  if (state.phase !== 'combat') return state;
-  if (state.activePlayerId !== playerId) return state;
-  if (state.actionsThisTurn[playerId]) return state;
-
-  const player = state.players[playerId];
-  if (!player?.isAlive) return state;
-  if (player.mp < mpCost) return addLog(state, `❌ ${player.name}: MP insuficiente!`, 'system');
-  if (player.summonCount >= 3) return addLog(state, `❌ ${player.name}: máximo de 3 invocações!`, 'system');
-
-  const summon = createAnimalSummon(templateId, playerId, player.level, player.attack);
-  const updatedPlayer = { ...player, mp: player.mp - mpCost, summonCount: player.summonCount + 1 };
-
-  const newState = {
-    ...state,
-    players: { ...state.players, [playerId]: updatedPlayer },
-    monsters: [...state.monsters, summon],
-    actionsThisTurn: { ...state.actionsThisTurn, [playerId]: true },
-    combatLog: [...state.combatLog, makeLog(state.turn, `🐾 ${player.name} invoca ${summon.emoji} ${summon.name}! [HP:${summon.hp} ATK:${summon.attack}] — ${summon.summonDuration} turnos`, 'player_action')],
-  };
-
-  return advanceAfterAction(newState, playerId);
-}
-
-export function summonNecroShadow(state: GameState, playerId: string): GameState {
-  if (state.phase !== 'combat') return state;
-  if (state.activePlayerId !== playerId) return state;
-  if (state.actionsThisTurn[playerId]) return state;
-
-  const player = state.players[playerId];
-  if (!player?.isAlive) return state;
-  if (player.mp < 40) return addLog(state, `❌ ${player.name}: MP insuficiente!`, 'system');
-  if (player.soulCount <= 0) return addLog(state, `❌ ${player.name}: sem Almas! [${player.soulCount}/5]`, 'system');
-
-  const lastKilled = (state as any).__lastKilledMonster as Monster | undefined;
-  const shadow = createNecroShadow(lastKilled ?? null, playerId, player.level, player.attack);
-  const updatedPlayer = { ...player, mp: player.mp - 40, soulCount: player.soulCount - 1 };
-
-  const newState = {
-    ...state,
-    players: { ...state.players, [playerId]: updatedPlayer },
-    monsters: [...state.monsters, shadow],
-    actionsThisTurn: { ...state.actionsThisTurn, [playerId]: true },
-    combatLog: [...state.combatLog, makeLog(state.turn, `👻 ${player.name} gasta 1 Alma e invoca ${shadow.name}! [${updatedPlayer.soulCount}/5 almas restantes]`, 'player_action')],
   };
 
   return advanceAfterAction(newState, playerId);
@@ -461,25 +422,38 @@ function checkBattleResult(state: GameState): GameState {
   const alivePlayers = Object.values(state.players).filter(p => p.isAlive);
   const aliveEnemies = state.monsters.filter(m => m.hp > 0 && !m.isSummon);
 
-  // Defeat
   if (alivePlayers.length === 0) {
     return { ...state, phase: 'defeat', combatLog: [...state.combatLog, makeLog(state.turn, `💀 DERROTA! O grupo foi aniquilado.`, 'system')] };
   }
 
-  // All enemies dead
   if (aliveEnemies.length === 0) {
     const hadBoss = state.monsters.some(m => m.isBoss && !m.isSummon);
-
-    if (!hadBoss) {
-      // Spawn boss
-      return spawnBoss(state);
-    }
-
-    // Boss killed = victory!
+    if (!hadBoss) return spawnBoss(state);
     return handleVictory(state);
   }
 
+  // ── Verificar loja intermediária ────────────────────────
+  // Conta ações deste turno — se todos os jogadores agiram E os monstros também (turn incrementou)
+  // O turno incrementa em processMonsterPhase, então checamos aqui após cada ação
+  const shopCountdown = state.shopCountdown;
+  if (shopCountdown <= 0 && !state.bossDefeated && state.phase === 'combat') {
+    return openMidCombatShop(state);
+  }
+
   return state;
+}
+
+function openMidCombatShop(state: GameState): GameState {
+  return {
+    ...state,
+    phase: 'shopping',
+    shopReady: {},
+    combatLog: [
+      ...state.combatLog,
+      makeLog(state.turn, `🛒 Pausa de combate! Loja aberta por 3 turnos!`, 'system'),
+      makeLog(state.turn, `⚠️ Após todos confirmarem, o combate retoma.`, 'system'),
+    ],
+  };
 }
 
 function handleVictory(state: GameState): GameState {
@@ -487,14 +461,13 @@ function handleVictory(state: GameState): GameState {
   const nextMapId = (state.currentMap + 1) as MapId;
   let newState = { ...state };
 
-  // Unlock next map
   if (nextMapId <= 12 && !newState.unlockedMaps.includes(nextMapId)) {
     newState = { ...newState, unlockedMaps: [...newState.unlockedMaps, nextMapId] };
     const next = MAPS.find(m => m.id === nextMapId);
     if (next) newState = addLog(newState, `🗺️ ${next.theme} ${next.name} desbloqueado!`, 'level_up');
   }
 
-  // Map 7 boss drops transform item
+  // Mapa 7 dropa transform item
   if (state.currentMap === 7) {
     const newPlayers = { ...newState.players };
     Object.keys(newPlayers).forEach(pid => {
@@ -506,7 +479,6 @@ function handleVictory(state: GameState): GameState {
     newState = addLog(newState, `✨ Essência do Deus Antigo obtida!`, 'level_up');
   }
 
-  // Full heal, boss XP/coins
   const newPlayers = { ...newState.players };
   Object.keys(newPlayers).forEach(pid => {
     let p = { ...newPlayers[pid], hp: newPlayers[pid].maxHp, mp: newPlayers[pid].maxMp, isAlive: true };
@@ -516,7 +488,6 @@ function handleVictory(state: GameState): GameState {
     newPlayers[pid] = p;
   });
 
-  // Dismiss summons
   const cleanMonsters = newState.monsters.filter(m => !m.isSummon);
   const summonResetPlayers = { ...newPlayers };
   Object.keys(summonResetPlayers).forEach(pid => {
@@ -528,8 +499,6 @@ function handleVictory(state: GameState): GameState {
 
   return { ...newState, phase: 'victory_shopping', shopReady: {} };
 }
-
-// ─── Next Map ─────────────────────────────────────────────
 
 export function proceedToNextMap(state: GameState): GameState {
   const nextId = (state.currentMap + 1) as MapId;
@@ -553,6 +522,7 @@ export function proceedToNextMap(state: GameState): GameState {
     activeUlt: null,
     bossDefeated: false,
     waveNumber: 0,
+    shopCountdown: SHOP_INTERVAL,
     combatLog: [...state.combatLog, makeLog(0, `🗺️ Avançando para ${nm.theme} ${nm.name}!`, 'system')],
   };
 }
@@ -560,8 +530,6 @@ export function proceedToNextMap(state: GameState): GameState {
 export function clearUlt(state: GameState): GameState {
   return { ...state, activeUlt: null };
 }
-
-// ─── Disconnect Handling ──────────────────────────────────
 
 export function handleDisconnect(state: GameState, playerId: string): GameState {
   if (!state.players[playerId]) return state;
@@ -581,7 +549,6 @@ export function handleDisconnect(state: GameState, playerId: string): GameState 
     combatLog: [...state.combatLog, makeLog(state.turn, `${name} saiu da sala.`, 'system')],
   };
 
-  // If it was their turn, advance
   if (state.activePlayerId === playerId) {
     const next = newOrder.find(pid => newPlayers[pid]?.isAlive && !newActions[pid]);
     newState = { ...newState, activePlayerId: next ?? null };
@@ -609,20 +576,29 @@ function gameToCombat(state: GameState): any {
 }
 
 function combatToGame(original: GameState, combatState: any): GameState {
+  // Calcula shopCountdown com base no turno atual vs anterior
+  const prevTurn = original.turn;
+  const newTurn = combatState.turn;
+  let shopCountdown = original.shopCountdown;
+
+  if (newTurn > prevTurn) {
+    // Um turno completo passou (monstros agiram)
+    shopCountdown = Math.max(0, shopCountdown - (newTurn - prevTurn));
+  }
+
   return {
     ...original,
     players: combatState.players,
     monsters: combatState.monsters,
-    turn: combatState.turn,
+    turn: newTurn,
     actionsThisTurn: combatState.actionsThisTurn,
     combatLog: combatState.log,
     activePlayerId: combatState.activePlayerId,
     groupMomentum: combatState.groupMomentum,
     synergyReady: combatState.synergyReady,
+    shopCountdown,
   };
 }
-
-// ─── Advance after action helper ─────────────────────────
 
 function advanceAfterAction(state: GameState, playerId: string): GameState {
   const nextPid = state.playerOrder.find(pid => state.players[pid]?.isAlive && !state.actionsThisTurn[pid] && pid !== playerId);
@@ -635,8 +611,6 @@ function advanceAfterAction(state: GameState, playerId: string): GameState {
   }
   return { ...state, activePlayerId: null };
 }
-
-// ─── Log Utility ──────────────────────────────────────────
 
 function addLog(state: GameState, message: string, type: LogEntry['type']): GameState {
   return { ...state, combatLog: [...state.combatLog, makeLog(state.turn, message, type)] };

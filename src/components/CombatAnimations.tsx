@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { CombatLogEntry } from '@/lib/types';
+import type { LogEntry as CombatLogEntry } from '@/engine/types';
 
 /* ════════════════════════════════════════════════════
    FLOATING DAMAGE NUMBERS — Pixel JRPG Style
@@ -141,9 +141,7 @@ export function FloatingDamageNumbers({ log }: { log: CombatLogEntry[] }) {
               letterSpacing: '0.04em',
               imageRendering: 'pixelated' as any,
               opacity: n.dying ? 0 : 1,
-              transform: n.dying
-                ? `translateY(-50px) scale(0.7)`
-                : undefined,
+              transform: n.dying ? `translateY(-50px) scale(0.7)` : undefined,
               transition: n.dying ? 'all 0.45s ease' : undefined,
               animation: n.dying
                 ? 'none'
@@ -152,7 +150,6 @@ export function FloatingDamageNumbers({ log }: { log: CombatLogEntry[] }) {
               userSelect: 'none',
             }}
           >
-            {/* Crit label */}
             {isCrit && (
               <div style={{
                 fontSize: 8,
@@ -175,7 +172,7 @@ export function FloatingDamageNumbers({ log }: { log: CombatLogEntry[] }) {
 }
 
 /* ════════════════════════════════════════════════════
-   STATUS POPUP BANNERS — Pixel JRPG dialog style
+   STATUS POPUP BANNERS
    ════════════════════════════════════════════════════ */
 
 interface StatusBanner {
@@ -196,14 +193,15 @@ const STATUS_PATTERNS: Array<{
 }> = [
   { pattern: /EXECUÇÃO|execução/i, icon: '💀', color: '#ff4400', outlineColor: '#550000', label: () => 'EXECUÇÃO!' },
   { pattern: /CRÍTICO|crítico/i, icon: '⚡', color: '#ffcc00', outlineColor: '#664400', label: () => 'CRÍTICO!' },
-  { pattern: /ESQUIVA/i, icon: '💨', color: '#44ffdd', outlineColor: '#005544', label: m => 'ESQUIVA!' },
+  { pattern: /ESQUIVA/i, icon: '💨', color: '#44ffdd', outlineColor: '#005544', label: () => 'ESQUIVA!' },
   { pattern: /CONTRA-ATACA/i, icon: '🔄', color: '#ff8800', outlineColor: '#552200', label: () => 'COUNTER!' },
   { pattern: /ENRAIVECEU/i, icon: '🔴', color: '#ff2200', outlineColor: '#660000', label: () => 'FÚRIA!' },
   { pattern: /invulnerável/i, icon: '🛡️', color: '#aabbcc', outlineColor: '#334455', label: () => 'INVULN!' },
   { pattern: /LEVANTOU|ressuscita/i, icon: '✝️', color: '#ffcc00', outlineColor: '#664400', label: () => 'REVIVE!' },
   { pattern: /Nível (\d+)/i, icon: '⬆', color: '#ffcc00', outlineColor: '#664400', label: m => `LV UP! → ${m[1]}` },
   { pattern: /MURALHA/i, icon: '🏰', color: '#ccddee', outlineColor: '#334455', label: () => 'MURALHA!' },
-  { pattern: /TRANSFORMAÇÃO/i, icon: '🌟', color: '#ffcc00', outlineColor: '#664400', label: () => 'TRANSFORM!' },
+  { pattern: /TRANSFORMAÇÃO|TRANSFORM/i, icon: '🌟', color: '#ffcc00', outlineColor: '#664400', label: () => 'TRANSFORM!' },
+  { pattern: /SINERGIA/i, icon: '✨', color: '#ffaa00', outlineColor: '#664400', label: () => 'SINERGIA!' },
 ];
 
 export function StatusBanners({ log }: { log: CombatLogEntry[] }) {
@@ -218,7 +216,7 @@ export function StatusBanners({ log }: { log: CombatLogEntry[] }) {
 
     const newBanners: StatusBanner[] = [];
     for (const entry of newEntries) {
-      if (entry.type === 'system' || entry.type === 'player_action' || entry.type === 'level_up' || entry.type === 'death') {
+      if (entry.type === 'system' || entry.type === 'player_action' || entry.type === 'level_up' || entry.type === 'death' || entry.type === 'synergy') {
         for (const sp of STATUS_PATTERNS) {
           const m = entry.message.match(sp.pattern);
           if (m) {

@@ -5,6 +5,7 @@
 
 import { ClassType, ClassDefinition, MapId, Monster, Item } from './types';
 import { nanoid } from 'nanoid';
+import { BALANCE } from './utils';
 
 // ─── Class Definitions ────────────────────────────────────
 

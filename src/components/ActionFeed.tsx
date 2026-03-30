@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { CombatLogEntry } from '@/engine/types';
+import type { LogEntry as CombatLogEntry } from '@/engine/types';
 
 interface ActionFeedProps {
   log: CombatLogEntry[];
@@ -56,15 +56,19 @@ const TYPE_CONFIG: Record<string, {
     bg: 'linear-gradient(135deg, rgba(100,0,0,0.92), rgba(60,0,0,0.88))',
     glow: '0 0 22px rgba(255,0,0,0.4)',
   },
+  synergy: {
+    icon: '✨',
+    color: '#ffaa00',
+    border: '#aa6600',
+    bg: 'linear-gradient(135deg, rgba(80,50,0,0.92), rgba(50,30,0,0.88))',
+    glow: '0 0 22px rgba(255,170,0,0.5)',
+  },
 };
 
-// Which log types should show as toasts (skip spammy system messages)
-const SHOW_TYPES = new Set(['player_action', 'monster_action', 'level_up', 'death']);
+const SHOW_TYPES = new Set(['player_action', 'monster_action', 'level_up', 'death', 'synergy']);
 
-// Filter out very short/boring system lines, only show impactful ones
 function shouldShow(entry: CombatLogEntry): boolean {
   if (SHOW_TYPES.has(entry.type)) return true;
-  // Show important system messages
   if (entry.type === 'system') {
     const msg = entry.message;
     return (
@@ -86,11 +90,9 @@ function shouldShow(entry: CombatLogEntry): boolean {
 
 export default function ActionFeed({ log }: ActionFeedProps) {
   const [toasts, setToasts] = useState<Toast[]>([]);
-  // Initialize to log.length so we never replay history on mount/remount
   const prevLenRef = useRef(log.length);
   const timerRefs = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
-  // When log shrinks (e.g. new combat/phase reset), sync the ref
   useEffect(() => {
     if (log.length < prevLenRef.current) {
       prevLenRef.current = log.length;
@@ -105,33 +107,31 @@ export default function ActionFeed({ log }: ActionFeedProps) {
 
     if (newEntries.length === 0) return;
 
-    // Add toasts staggered
     newEntries.forEach((entry, i) => {
       const toastId = entry.id;
-      setTimeout(() => {
+      const stagger = setTimeout(() => {
         setToasts(prev => {
-          // max 4 visible at once — remove oldest if needed
           const trimmed = prev.length >= 4 ? prev.slice(1) : prev;
           return [...trimmed, { id: toastId, message: entry.message, type: entry.type, dying: false }];
         });
 
-        // Start fade-out after 2.8s
         const fadeTimer = setTimeout(() => {
           setToasts(prev => prev.map(t => t.id === toastId ? { ...t, dying: true } : t));
-          // Remove after fade
           const removeTimer = setTimeout(() => {
             setToasts(prev => prev.filter(t => t.id !== toastId));
             timerRefs.current.delete(toastId);
+            timerRefs.current.delete(toastId + '_rm');
           }, 400);
           timerRefs.current.set(toastId + '_rm', removeTimer);
         }, 2800);
 
         timerRefs.current.set(toastId, fadeTimer);
       }, i * 120);
+
+      timerRefs.current.set(toastId + '_stagger', stagger);
     });
   }, [log]);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       timerRefs.current.forEach(t => clearTimeout(t));
@@ -157,7 +157,7 @@ export default function ActionFeed({ log }: ActionFeedProps) {
       {toasts.map((toast, idx) => {
         const cfg = TYPE_CONFIG[toast.type] ?? TYPE_CONFIG.system;
         const isNewest = idx === toasts.length - 1;
-        const age = idx / Math.max(toasts.length - 1, 1); // 0 = oldest, 1 = newest
+        const age = toasts.length <= 1 ? 1 : idx / (toasts.length - 1);
 
         return (
           <div
@@ -184,7 +184,6 @@ export default function ActionFeed({ log }: ActionFeedProps) {
               backdropFilter: 'blur(4px)',
             }}
           >
-            {/* Left accent bar */}
             <div style={{
               width: 3,
               alignSelf: 'stretch',
@@ -193,12 +192,10 @@ export default function ActionFeed({ log }: ActionFeedProps) {
               opacity: isNewest ? 1 : 0.4,
             }} />
 
-            {/* Icon */}
             <span style={{ fontSize: 16, flexShrink: 0, lineHeight: 1 }}>
               {cfg.icon}
             </span>
 
-            {/* Message */}
             <span style={{
               fontFamily: "'VT323', monospace",
               fontSize: 18,
@@ -211,7 +208,6 @@ export default function ActionFeed({ log }: ActionFeedProps) {
               {toast.message}
             </span>
 
-            {/* Turn badge — only newest */}
             {isNewest && (
               <span style={{
                 fontFamily: "'Press Start 2P', monospace",

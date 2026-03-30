@@ -60,7 +60,7 @@ export function processPlayerAction(
     primaryTargets = [target];
 
     const roll = rollDice();
-    const crit = roll === BALANCE.CRIT_ROLLS;
+    const crit = roll === BALANCE.CRIT_ROLL;
     const dmg = calcDamage({
       attackerAtk: player.attack,
       targetDef: isStunned(target) ? 0 : getEffectiveDef(target),
@@ -699,6 +699,3 @@ function processItemUse(state: CombatState, playerId: string, itemId: string): C
     log: [...state.log, makeLog(state.turn, `${player.name} usa ${item.emoji} ${item.name}!`, 'player_action')],
   };
 }
-
-// Export the CRIT_ROLLS constant (missing from utils)
-Object.assign(BALANCE, { CRIT_ROLLS: 10 });
