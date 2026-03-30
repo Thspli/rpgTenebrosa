@@ -1,8 +1,8 @@
 // ═══════════════════════════════════════════════════════════
 //  src/engine/gameEngine.ts — Game Engine v2 (CORRIGIDO)
 //  Correções:
-//  1. Loja intermediária a cada SHOP_INTERVAL turnos funciona
-//  2. shopCountdown atualizado corretamente
+//  1. REMOVIDO: Loja intermediária a cada SHOP_INTERVAL turnos foi desabilitada
+//  2. REMOVIDO: shopCountdown foi removido completamente
 //  3. Derrota verificada corretamente
 //  4. proceedToNextMap exportado corretamente
 // ═══════════════════════════════════════════════════════════
@@ -17,7 +17,8 @@ import { CLASS_SKILLS, canUseSkill, spendMp } from './skills';
 import { processPlayerAction as combatAction, handleMonsterDeath, getNextActivePlayer } from './combat';
 import { xpToNextLevel, makeLog, applyXp } from './utils';
 
-const SHOP_INTERVAL = 3; // abre loja a cada 3 turnos
+// REMOVIDO: SHOP_INTERVAL foi removido pois loja intermediária foi desabilitada
+// const SHOP_INTERVAL = 3; // abre loja a cada 3 turnos
 
 declare global { var gameRooms: Map<string, GameState>; }
 if (!global.gameRooms) global.gameRooms = new Map();
@@ -57,7 +58,8 @@ function createInitialState(roomId: string): GameState {
     activePlayerId: null,
     bossDefeated: false,
     waveNumber: 0,
-    shopCountdown: SHOP_INTERVAL,
+    // REMOVIDO: shopCountdown foi removido pois loja intermediária foi desabilitada
+    // shopCountdown: SHOP_INTERVAL,
     shopReady: {},
     groupMomentum: 0,
     synergyReady: false,
@@ -247,7 +249,8 @@ export function startCombat(state: GameState): GameState {
     shopReady: {},
     bossDefeated: false,
     waveNumber: 0,
-    shopCountdown: SHOP_INTERVAL,
+    // REMOVIDO: shopCountdown foi removido pois loja intermediária foi desabilitada
+    // shopCountdown: SHOP_INTERVAL,
     activeUlt: null,
     monsters: [],
     groupMomentum: 0,
@@ -265,8 +268,9 @@ function resumeCombat(state: GameState): GameState {
     phase: 'combat',
     actionsThisTurn: {},
     shopReady: {},
-    shopCountdown: SHOP_INTERVAL,
-    combatLog: [...state.combatLog, makeLog(state.turn, `⚔️ Combate retomado! Próxima pausa em ${SHOP_INTERVAL} turnos.`, 'system')],
+    // REMOVIDO: shopCountdown foi removido pois loja intermediária foi desabilitada
+    // shopCountdown: SHOP_INTERVAL,
+    combatLog: [...state.combatLog, makeLog(state.turn, `⚔️ Combate retomado!`, 'system')],
   };
 
   const first = newState.playerOrder.find(pid => newState.players[pid]?.isAlive);
@@ -433,28 +437,28 @@ function checkBattleResult(state: GameState): GameState {
   }
 
   // ── Verificar loja intermediária ────────────────────────
-  // Conta ações deste turno — se todos os jogadores agiram E os monstros também (turn incrementou)
-  // O turno incrementa em processMonsterPhase, então checamos aqui após cada ação
-  const shopCountdown = state.shopCountdown;
-  if (shopCountdown <= 0 && !state.bossDefeated && state.phase === 'combat') {
-    return openMidCombatShop(state);
-  }
+  // REMOVIDO: Loja intermediária a cada X turnos foi desabilitada
+  // const shopCountdown = state.shopCountdown;
+  // if (shopCountdown <= 0 && !state.bossDefeated && state.phase === 'combat') {
+  //   return openMidCombatShop(state);
+  // }
 
   return state;
 }
 
-function openMidCombatShop(state: GameState): GameState {
-  return {
-    ...state,
-    phase: 'shopping',
-    shopReady: {},
-    combatLog: [
-      ...state.combatLog,
-      makeLog(state.turn, `🛒 Pausa de combate! Loja aberta por 3 turnos!`, 'system'),
-      makeLog(state.turn, `⚠️ Após todos confirmarem, o combate retoma.`, 'system'),
-    ],
-  };
-}
+// REMOVIDO: Função openMidCombatShop foi removida pois loja intermediária foi desabilitada
+// function openMidCombatShop(state: GameState): GameState {
+//   return {
+//     ...state,
+//     phase: 'shopping',
+//     shopReady: {},
+//     combatLog: [
+//       ...state.combatLog,
+//       makeLog(state.turn, `🛒 Pausa de combate! Loja aberta por 3 turnos!`, 'system'),
+//       makeLog(state.turn, `⚠️ Após todos confirmarem, o combate retoma.`, 'system'),
+//     ],
+//   };
+// }
 
 function handleVictory(state: GameState): GameState {
   const mapDef = MAPS.find(m => m.id === state.currentMap)!;
@@ -522,7 +526,8 @@ export function proceedToNextMap(state: GameState): GameState {
     activeUlt: null,
     bossDefeated: false,
     waveNumber: 0,
-    shopCountdown: SHOP_INTERVAL,
+    // REMOVIDO: shopCountdown foi removido pois loja intermediária foi desabilitada
+    // shopCountdown: SHOP_INTERVAL,
     combatLog: [...state.combatLog, makeLog(0, `🗺️ Avançando para ${nm.theme} ${nm.name}!`, 'system')],
   };
 }
@@ -576,15 +581,8 @@ function gameToCombat(state: GameState): any {
 }
 
 function combatToGame(original: GameState, combatState: any): GameState {
-  // Calcula shopCountdown com base no turno atual vs anterior
-  const prevTurn = original.turn;
+  // REMOVIDO: Lógica de shopCountdown foi removida pois loja intermediária foi desabilitada
   const newTurn = combatState.turn;
-  let shopCountdown = original.shopCountdown;
-
-  if (newTurn > prevTurn) {
-    // Um turno completo passou (monstros agiram)
-    shopCountdown = Math.max(0, shopCountdown - (newTurn - prevTurn));
-  }
 
   return {
     ...original,
@@ -596,7 +594,8 @@ function combatToGame(original: GameState, combatState: any): GameState {
     activePlayerId: combatState.activePlayerId,
     groupMomentum: combatState.groupMomentum,
     synergyReady: combatState.synergyReady,
-    shopCountdown,
+    // REMOVIDO: shopCountdown foi removido pois loja intermediária foi desabilitada
+    // shopCountdown,
   };
 }
 

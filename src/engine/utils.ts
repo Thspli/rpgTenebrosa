@@ -256,3 +256,14 @@ export function applyXp(player: Player, xpGain: number): { player: Player; level
 
   return { player: p, leveled, newLevel };
 }
+
+// ─── Emoji Utilities ──────────────────────────────────────
+/**
+ * Get the emoji to display for a unit/skill
+ * Returns a random variant if emojiVariants exists, otherwise the base emoji
+ */
+export function getDisplayEmoji(emoji: string, variants?: string[]): string {
+  if (!variants || variants.length === 0) return emoji;
+  const randomIndex = Math.floor(Math.random() * variants.length);
+  return variants[randomIndex];
+}

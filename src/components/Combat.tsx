@@ -182,7 +182,8 @@ export default function Combat({ gameState, myId, onAction, onReset, onClearUlt,
               ⚡ {activePl.name} {CLASSES[activePl.classType].emoji}
             </span>
           )}
-          <span className={styles.shopBadge}>🛒 {gameState.shopCountdown}t</span>
+          {/* REMOVIDO: Badge da loja foi removido pois loja intermediária foi desabilitada */}
+          {/* <span className={styles.shopBadge}>🛒 {gameState.shopCountdown}t</span> */}
           <span className={styles.coinsBadge}>💰 {gameState.groupCoins}</span>
         </div>
       </div>

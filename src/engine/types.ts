@@ -157,6 +157,7 @@ export interface Skill {
   id: string;
   name: string;
   emoji: string;
+  emojiVariants?: string[]; // Additional emoji options for variety
   description: string;
   mpCost: number;
   target: SkillTarget;
@@ -203,7 +204,8 @@ export interface GameState {
   activePlayerId: string | null;
   bossDefeated: boolean;
   waveNumber: number;
-  shopCountdown: number;
+  // REMOVIDO: shopCountdown foi removido pois loja intermediária foi desabilitada
+  // shopCountdown: number;
   shopReady: Record<string, boolean>;
   // Synergy
   groupMomentum: number;
@@ -258,6 +260,7 @@ export interface Item {
 export interface ClassDefinition {
   name: string;
   emoji: string;
+  emojiVariants: string[]; // Additional emoji options for variety
   description: string;
   color: string;
   role: 'tank' | 'dps' | 'support' | 'hybrid';

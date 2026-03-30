@@ -64,7 +64,7 @@ function healUnit(target: Player, amount: number, result: SkillResult): Player {
 export const WARRIOR_SKILLS: Skill[] = [
   {
     id: 'warrior_heavy_strike',
-    name: 'Golpe Pesado', emoji: '⚔️', mpCost: 0,
+    name: 'Golpe Pesado', emoji: '⚔️', emojiVariants: ['⚔️', '🗡️', '🔨', '🪓'], mpCost: 0,
     description: '+8 dano bônus. Simples e confiável.',
     target: 'enemy', category: 'attack',
     execute(ctx) {
@@ -79,7 +79,7 @@ export const WARRIOR_SKILLS: Skill[] = [
   },
   {
     id: 'warrior_provoke',
-    name: 'Provocar', emoji: '😤', mpCost: 10,
+    name: 'Provocar', emoji: '😤', emojiVariants: ['😤', '😠', '🤬', '👹'], mpCost: 10,
     description: 'Força inimigos a atacar você por 2 turnos.',
     target: 'none', category: 'buff',
     execute(ctx) {
@@ -93,7 +93,7 @@ export const WARRIOR_SKILLS: Skill[] = [
   },
   {
     id: 'warrior_battle_cry',
-    name: 'Grito de Guerra', emoji: '📣', mpCost: 20,
+    name: 'Grito de Guerra', emoji: '📣', emojiVariants: ['📣', '🔔', '📢', '🎺'], mpCost: 20,
     description: '+6 ATK para todos do grupo por 3 turnos.',
     target: 'ally_aoe', category: 'buff', synergyTag: 'war_cry',
     execute(ctx) {
@@ -113,7 +113,7 @@ export const WARRIOR_SKILLS: Skill[] = [
   },
   {
     id: 'warrior_whirlwind',
-    name: 'Investida', emoji: '🌪️', mpCost: 20,
+    name: 'Investida', emoji: '🌪️', emojiVariants: ['🌪️', '💨', '⚡', '🏃'], mpCost: 20,
     description: 'Ataca TODOS os inimigos (+10 dano bônus).',
     target: 'enemy_aoe', category: 'attack',
     execute(ctx) {
@@ -134,7 +134,7 @@ export const WARRIOR_SKILLS: Skill[] = [
   },
   {
     id: 'warrior_shield_block',
-    name: 'Bloquear', emoji: '🛡️', mpCost: 15,
+    name: 'Bloquear', emoji: '🛡️', emojiVariants: ['🛡️', '🧱', '🏛️', '🪨'], mpCost: 15,
     description: '+12 DEF por 2 turnos.',
     target: 'self', category: 'buff',
     execute(ctx) {
@@ -149,7 +149,7 @@ export const WARRIOR_SKILLS: Skill[] = [
   },
   {
     id: 'warrior_fury',
-    name: 'Fúria de Batalha', emoji: '💢', mpCost: 30,
+    name: 'Fúria de Batalha', emoji: '💢', emojiVariants: ['💢', '🔥', '💥', '😡'], mpCost: 30,
     description: '+20 dano, ignora 85% da DEF do alvo.',
     target: 'enemy', category: 'attack',
     execute(ctx) {
@@ -198,7 +198,7 @@ export const WARRIOR_SKILLS: Skill[] = [
 export const MAGE_SKILLS: Skill[] = [
   {
     id: 'mage_fireball',
-    name: 'Bola de Fogo', emoji: '🔥', mpCost: 15,
+    name: 'Bola de Fogo', emoji: '🔥', emojiVariants: ['🔥', '🌋', '🔴', '✨'], mpCost: 15,
     description: '+10 dano de fogo.',
     target: 'enemy', category: 'magic',
     execute(ctx) {
@@ -213,7 +213,7 @@ export const MAGE_SKILLS: Skill[] = [
   },
   {
     id: 'mage_ice_ray',
-    name: 'Raio de Gelo', emoji: '❄️', mpCost: 12,
+    name: 'Raio de Gelo', emoji: '❄️', emojiVariants: ['❄️', '🧊', '🍦', '💎'], mpCost: 12,
     description: '+8 dano + lentidão (-30% dano) por 2 turnos.',
     target: 'enemy', category: 'magic',
     execute(ctx) {
@@ -231,7 +231,7 @@ export const MAGE_SKILLS: Skill[] = [
   },
   {
     id: 'mage_arcane_shield',
-    name: 'Escudo Arcano', emoji: '🔵', mpCost: 20,
+    name: 'Escudo Arcano', emoji: '🔵', emojiVariants: ['🔵', '🛡️', '⭕', '💠'], mpCost: 20,
     description: '+10 DEF por 2 turnos (própria).',
     target: 'self', category: 'buff',
     execute(ctx) {
@@ -246,7 +246,7 @@ export const MAGE_SKILLS: Skill[] = [
   },
   {
     id: 'mage_arcane_explosion',
-    name: 'Explosão Arcana', emoji: '💥', mpCost: 50,
+    name: 'Explosão Arcana', emoji: '💥', emojiVariants: ['💥', '✨', '⚡', '🌪️'], mpCost: 50,
     description: 'Dano MASSIVO em todos os inimigos.',
     target: 'enemy_aoe', category: 'magic',
     execute(ctx) {
@@ -267,7 +267,7 @@ export const MAGE_SKILLS: Skill[] = [
   },
   {
     id: 'mage_lightning',
-    name: 'Raio Veloz', emoji: '⚡', mpCost: 18,
+    name: 'Raio Veloz', emoji: '⚡', emojiVariants: ['⚡', '🌩️', '🔌', '💫'], mpCost: 18,
     description: '+14 dano elétrico.',
     target: 'enemy', category: 'magic',
     execute(ctx) {
@@ -282,7 +282,7 @@ export const MAGE_SKILLS: Skill[] = [
   },
   {
     id: 'mage_meteor',
-    name: 'Chuva de Meteoros', emoji: '☄️', mpCost: 55,
+    name: 'Chuva de Meteoros', emoji: '☄️', emojiVariants: ['☄️', '🌌', '💫', '⭐'], mpCost: 55,
     description: 'Meteoros em todos os inimigos.',
     target: 'enemy_aoe', category: 'magic',
     execute(ctx) {
@@ -336,7 +336,7 @@ export const MAGE_SKILLS: Skill[] = [
 export const ROGUE_SKILLS: Skill[] = [
   {
     id: 'rogue_stab',
-    name: 'Punhalada', emoji: '🗡️', mpCost: 0,
+    name: 'Punhalada', emoji: '🗡️', emojiVariants: ['🗡️', '🔪', '🗝️', '⚔️'], mpCost: 0,
     description: '+5 dano básico.',
     target: 'enemy', category: 'attack',
     execute(ctx) {
@@ -351,7 +351,7 @@ export const ROGUE_SKILLS: Skill[] = [
   },
   {
     id: 'rogue_poison',
-    name: 'Envenenar', emoji: '☠️', mpCost: 20,
+    name: 'Envenenar', emoji: '☠️', emojiVariants: ['☠️', '🐍', '☣️', '💀'], mpCost: 20,
     description: 'Veneno: 10 dano/turno por 4 turnos.',
     target: 'enemy', category: 'attack',
     execute(ctx) {
@@ -367,7 +367,7 @@ export const ROGUE_SKILLS: Skill[] = [
   },
   {
     id: 'rogue_smoke',
-    name: 'Fumaça', emoji: '💨', mpCost: 15,
+    name: 'Fumaça', emoji: '💨', emojiVariants: ['💨', '💫', '🌫️', '👁️'], mpCost: 15,
     description: 'Esquiva dos próximos 2 ataques.',
     target: 'self', category: 'buff',
     execute(ctx) {
@@ -467,7 +467,7 @@ export const ROGUE_SKILLS: Skill[] = [
 export const NECROMANCER_SKILLS: Skill[] = [
   {
     id: 'necro_shadow_ray',
-    name: 'Raio Sombrio', emoji: '🖤', mpCost: 10,
+    name: 'Raio Sombrio', emoji: '🖤', emojiVariants: ['🖤', '👁️', '🌑', '🕷️'], mpCost: 10,
     description: '+10 dano sombrio.',
     target: 'enemy', category: 'magic',
     execute(ctx) {
@@ -482,7 +482,7 @@ export const NECROMANCER_SKILLS: Skill[] = [
   },
   {
     id: 'necro_drain',
-    name: 'Drenar Vida', emoji: '🩸', mpCost: 20,
+    name: 'Drenar Vida', emoji: '🩸', emojiVariants: ['🩸', '🧛', '💀', '🩷'], mpCost: 20,
     description: '+12 dano, drena 18HP de volta.',
     target: 'enemy', category: 'magic',
     execute(ctx) {
@@ -503,7 +503,7 @@ export const NECROMANCER_SKILLS: Skill[] = [
   },
   {
     id: 'necro_curse',
-    name: 'Maldição Profunda', emoji: '🔮', mpCost: 25,
+    name: 'Maldição Profunda', emoji: '🔮', emojiVariants: ['🔮', '🖤', '🔥', '💀'], mpCost: 25,
     description: '-5 DEF e -4 ATK no alvo por 4 turnos.',
     target: 'enemy', category: 'magic',
     execute(ctx) {
