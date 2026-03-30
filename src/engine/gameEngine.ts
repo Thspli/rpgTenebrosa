@@ -55,7 +55,7 @@ function createInitialState(roomId: string): GameState {
     activePlayerId: null,
     bossDefeated: false,
     waveNumber: 0,
-    shopCountdown: 5,
+    shopCountdown: 0,
     shopReady: {},
     groupMomentum: 0,
     synergyReady: false,
@@ -253,7 +253,7 @@ export function startCombat(state: GameState): GameState {
     shopReady: {},
     bossDefeated: false,
     waveNumber: 0,
-    shopCountdown: 5,
+    shopCountdown: 0,
     activeUlt: null,
     monsters: [],
     groupMomentum: 0,
@@ -338,7 +338,6 @@ export function processAction(
   if (!state.players[playerId]?.isAlive) return state;
 
   // Bridge to the combat engine's processPlayerAction
-  // We need to convert GameState to CombatState and back
   const combatState = gameToCombat(state);
   const updatedCombat = combatAction(combatState, playerId, action as any);
   let newState = combatToGame(state, updatedCombat);
@@ -348,18 +347,8 @@ export function processAction(
     newState = { ...newState, activeUlt: (updatedCombat as any).pendingUlt };
   }
 
-  // Check battle result
+  // Check battle result — this is the only place shop can open (via handleVictory)
   newState = checkBattleResult(newState);
-
-  // Shop countdown check
-  if (newState.phase === 'combat' && newState.turn > state.turn) {
-    const newCountdown = newState.shopCountdown - 1;
-    if (newCountdown <= 0) {
-      newState = openShop(newState);
-    } else {
-      newState = { ...newState, shopCountdown: newCountdown };
-    }
-  }
 
   return newState;
 }
@@ -377,7 +366,6 @@ export function useTransform(state: GameState, playerId: string): GameState {
   if (player.transformUsedThisCombat) return addLog(state, `❌ ${player.name}: transformação já usada neste combate!`, 'system');
   if (player.transformed) return addLog(state, `❌ ${player.name}: já transformado!`, 'system');
 
-  // Apply transform bonuses (stored in transformData — for now use flat values)
   const atkBonus = Math.floor(player.attack * 1.2);
   const defBonus = Math.floor(player.defense * 1.0);
   const hpBonus = 80;
@@ -541,23 +529,7 @@ function handleVictory(state: GameState): GameState {
   return { ...newState, phase: 'victory_shopping', shopReady: {} };
 }
 
-// ─── Shop Continue / Next Map ─────────────────────────────
-
-function openShop(state: GameState): GameState {
-  // Give players coins
-  const newPlayers = { ...state.players };
-  Object.keys(newPlayers).forEach(pid => {
-    newPlayers[pid] = { ...newPlayers[pid], coins: newPlayers[pid].coins + 30 };
-  });
-  return {
-    ...state,
-    phase: 'shopping',
-    players: newPlayers,
-    shopReady: {},
-    shopCountdown: 5,
-    combatLog: [...state.combatLog, makeLog(state.turn, `🛒 Pausa para loja! +30 moedas para todos.`, 'system')],
-  };
-}
+// ─── Next Map ─────────────────────────────────────────────
 
 export function proceedToNextMap(state: GameState): GameState {
   const nextId = (state.currentMap + 1) as MapId;
@@ -619,8 +591,6 @@ export function handleDisconnect(state: GameState, playerId: string): GameState 
 }
 
 // ─── CombatState Bridge ───────────────────────────────────
-// The combat engine works on CombatState, game engine on GameState
-// These bridge functions convert between the two
 
 function gameToCombat(state: GameState): any {
   return {
@@ -655,7 +625,6 @@ function combatToGame(original: GameState, combatState: any): GameState {
 // ─── Advance after action helper ─────────────────────────
 
 function advanceAfterAction(state: GameState, playerId: string): GameState {
-  // Check if there's a next player
   const nextPid = state.playerOrder.find(pid => state.players[pid]?.isAlive && !state.actionsThisTurn[pid] && pid !== playerId);
   if (nextPid) {
     return {
@@ -664,7 +633,6 @@ function advanceAfterAction(state: GameState, playerId: string): GameState {
       combatLog: [...state.combatLog, makeLog(state.turn, `🎯 Vez de ${state.players[nextPid].name} agir!`, 'system')],
     };
   }
-  // All acted — monster phase handled by combat engine on next processAction call
   return { ...state, activePlayerId: null };
 }
 

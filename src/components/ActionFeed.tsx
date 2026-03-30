@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { CombatLogEntry } from '@/lib/types';
+import { CombatLogEntry } from '@/engine/types';
 
 interface ActionFeedProps {
   log: CombatLogEntry[];
@@ -86,8 +86,17 @@ function shouldShow(entry: CombatLogEntry): boolean {
 
 export default function ActionFeed({ log }: ActionFeedProps) {
   const [toasts, setToasts] = useState<Toast[]>([]);
-  const prevLenRef = useRef(0);
+  // Initialize to log.length so we never replay history on mount/remount
+  const prevLenRef = useRef(log.length);
   const timerRefs = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  // When log shrinks (e.g. new combat/phase reset), sync the ref
+  useEffect(() => {
+    if (log.length < prevLenRef.current) {
+      prevLenRef.current = log.length;
+      setToasts([]);
+    }
+  }, [log.length]);
 
   useEffect(() => {
     if (log.length <= prevLenRef.current) return;
