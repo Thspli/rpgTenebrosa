@@ -17,6 +17,7 @@ import { CLASS_SKILLS, canUseSkill, spendMp } from './skills';
 import { processPlayerAction as combatAction, handleMonsterDeath, getNextActivePlayer } from './combat';
 import { xpToNextLevel, makeLog, applyXp } from './utils';
 
+
 // REMOVIDO: SHOP_INTERVAL foi removido pois loja intermediária foi desabilitada
 // const SHOP_INTERVAL = 3; // abre loja a cada 3 turnos
 
