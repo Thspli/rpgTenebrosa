@@ -16,7 +16,15 @@ import { CLASSES, MAPS, SHOP_ITEMS, TRANSFORM_ITEM, createAnimalSummon, createNe
 import { CLASS_SKILLS, canUseSkill, spendMp } from './skills';
 import { processPlayerAction as combatAction, handleMonsterDeath, getNextActivePlayer } from './combat';
 import { xpToNextLevel, makeLog, applyXp } from './utils';
-
+import {
+  initComboState,
+  checkAndRegisterPrimer,
+  checkAndFireDetonator,
+  registerKill,
+  registerRevive,
+  tickCombosOnTurn,
+  type ComboStateExtension,
+} from './comboEngine';
 
 // REMOVIDO: SHOP_INTERVAL foi removido pois loja intermediária foi desabilitada
 // const SHOP_INTERVAL = 3; // abre loja a cada 3 turnos
@@ -578,6 +586,11 @@ function gameToCombat(state: GameState): any {
     momentumThreshold: BALANCE.MOMENTUM_MAX,
     synergyReady: state.synergyReady,
     pendingUlt: null,
+    activeCombos: [],
+    killsThisTurn: 0,
+    reviveHappenedThisTurn: false,
+    comboStreak: 0,
+    comboEvents: [],
   };
 }
 

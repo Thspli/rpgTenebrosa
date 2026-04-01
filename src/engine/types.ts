@@ -2,6 +2,18 @@
 //  REALM OF SHADOWS — Engine Types v2
 // ═══════════════════════════════════════════════════════════
 
+import type { ActiveCombo } from './comboEngine';
+
+// ─── UI Types ──────────────────────────────────────────────
+export interface ComboBannerEvent {
+  id: string;
+  comboName: string;
+  comboEmoji: string;
+  color: string;
+  bonusDamage?: number;
+  streakBonus?: number;
+}
+
 export type ClassType =
   | 'warrior' | 'mage' | 'rogue' | 'necromancer' | 'paladin'
   | 'ranger' | 'assassin' | 'elementalist' | 'berserker' | 'guardian'
@@ -186,6 +198,13 @@ export interface CombatState {
   synergyReady: boolean;
   // Boss ult pending (for cutscene)
   pendingUlt: UltCutsceneData | null;
+  // Combo system
+  activeCombos: ActiveCombo[];
+  killsThisTurn: number;
+  reviveHappenedThisTurn: boolean;
+  comboStreak: number;
+  // Combo events for UI
+  comboEvents?: ComboBannerEvent[];
 }
 
 // ─── Game State (full, includes non-combat) ───────────────

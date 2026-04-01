@@ -11,6 +11,15 @@ import {
 import { checkSynergies, checkMomentumSynergy } from './synergies';
 import { CLASS_SKILLS, canUseSkill, spendMp } from './skills';
 import { nanoid } from 'nanoid';
+import {
+  checkAndRegisterPrimer,
+  checkAndFireDetonator,
+  registerKill,
+  registerRevive,
+  tickCombosOnTurn,
+  initComboState,
+  COMBO_META,
+} from './comboEngine';
 
 // ─── Turn Order ───────────────────────────────────────────
 // Players act in their order. After all players, monsters act.
@@ -130,6 +139,51 @@ export function processPlayerAction(
     newState = mergeSkillResult(newState, result, playerId);
     usedSkillTag = skill.synergyTag;
 
+    // Combo system: check for primers and detonators
+    const comboExt = {
+      activeCombos: newState.activeCombos,
+      killsThisTurn: newState.killsThisTurn,
+      reviveHappenedThisTurn: newState.reviveHappenedThisTurn,
+      comboStreak: newState.comboStreak,
+    };
+    const comboResult = checkAndFireDetonator(newState, comboExt, updatedPlayer, skill.id, targetMonster);
+    if (comboResult.result.triggered) {
+      newState = {
+        ...newState,
+        activeCombos: comboResult.newExt.activeCombos,
+        killsThisTurn: comboResult.newExt.killsThisTurn,
+        reviveHappenedThisTurn: comboResult.newExt.reviveHappenedThisTurn,
+        comboStreak: comboResult.newExt.comboStreak,
+      };
+      // Apply combo result patches
+      newState = mergeSkillResult(newState, comboResult.result, playerId);
+      // Add combo banner event if combo was triggered
+      const comboMeta = COMBO_META[comboResult.result.comboType!];
+      if (comboMeta) {
+        newState = {
+          ...newState,
+          comboEvents: [...(newState.comboEvents || []), {
+            id: nanoid(),
+            comboName: comboMeta.name,
+            comboEmoji: comboMeta.emoji,
+            color: comboMeta.color,
+            bonusDamage: comboResult.result.bonusDamage,
+          }]
+        };
+      }
+    } else {
+      // No combo detonated, check if this skill registers a primer
+      const affectedMonsterIds = targetMonster ? [targetMonster.id] : [];
+      const newComboExt = checkAndRegisterPrimer(newState, comboExt, updatedPlayer, skill.id, affectedMonsterIds);
+      newState = {
+        ...newState,
+        activeCombos: newComboExt.activeCombos,
+        killsThisTurn: newComboExt.killsThisTurn,
+        reviveHappenedThisTurn: newComboExt.reviveHappenedThisTurn,
+        comboStreak: newComboExt.comboStreak,
+      };
+    }
+
     // ULT cutscene trigger
     if (result.triggerUltCutscene) {
       newState = { ...newState, pendingUlt: result.triggerUltCutscene };
@@ -238,11 +292,24 @@ function processMonsterPhase(state: CombatState): CombatState {
     groupMomentum: Math.max(0, newState.groupMomentum - BALANCE.MOMENTUM_DECAY_PER_TURN),
   };
 
-  // 9. Next turn setup
+  // 9. Combo system: tick combos on turn end
+  const comboExt = {
+    activeCombos: newState.activeCombos,
+    killsThisTurn: newState.killsThisTurn,
+    reviveHappenedThisTurn: newState.reviveHappenedThisTurn,
+    comboStreak: newState.comboStreak,
+  };
+  const tickedComboExt = tickCombosOnTurn(comboExt);
+
+  // 10. Next turn setup
   newState = {
     ...newState,
     turn: newState.turn + 1,
     actionsThisTurn: {},
+    activeCombos: tickedComboExt.activeCombos,
+    killsThisTurn: tickedComboExt.killsThisTurn,
+    reviveHappenedThisTurn: tickedComboExt.reviveHappenedThisTurn,
+    comboStreak: tickedComboExt.comboStreak,
   };
 
   // 10. Set next active player
@@ -589,10 +656,28 @@ export function handleMonsterDeath(state: CombatState, monster: Monster): Combat
   // Momentum from kill
   const newMomentum = Math.min(BALANCE.MOMENTUM_MAX, newState.groupMomentum + BALANCE.MOMENTUM_PER_KILL);
 
+  // Combo system: register kill
+  const comboExt = {
+    activeCombos: newState.activeCombos,
+    killsThisTurn: newState.killsThisTurn,
+    reviveHappenedThisTurn: newState.reviveHappenedThisTurn,
+    comboStreak: newState.comboStreak,
+  };
+  const killResult = registerKill(newState, comboExt);
+
+  // Handle triple kill combo if triggered
+  if (killResult.tripleKillResult) {
+    newState = mergeSkillResult(newState, killResult.tripleKillResult, ''); // empty string for group action
+  }
+
   return {
     ...newState,
     players: newPlayers,
     groupMomentum: newMomentum,
+    activeCombos: killResult.newExt.activeCombos,
+    killsThisTurn: killResult.newExt.killsThisTurn,
+    reviveHappenedThisTurn: killResult.newExt.reviveHappenedThisTurn,
+    comboStreak: killResult.newExt.comboStreak,
   };
 }
 

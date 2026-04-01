@@ -9,6 +9,7 @@ import {
   getMarkMultiplier, isStunned, makeLog, emptyResult, BALANCE, isCrit
 } from './utils';
 import { nanoid } from 'nanoid';
+import { registerRevive } from './comboEngine';
 
 // ─── Skill Builder Helpers ────────────────────────────────
 
@@ -711,6 +712,25 @@ export const PALADIN_SKILLS: Skill[] = [
       result.heals.push({ unitId: target.id, amount: revHp });
       result.logEntries.push(makeLog(ctx.state.turn, `✝️ ${ctx.caster.name} ressuscita ${target.name} com ${revHp} HP!`, 'player_action'));
       result.statePatches = { players: { ...ctx.state.players, [target.id]: { ...target, isAlive: true, hp: revHp } } };
+
+      // Combo system: register revive
+      if (ctx.state.activeCombos !== undefined) {
+        const comboExt = {
+          activeCombos: ctx.state.activeCombos,
+          killsThisTurn: ctx.state.killsThisTurn || 0,
+          reviveHappenedThisTurn: ctx.state.reviveHappenedThisTurn || false,
+          comboStreak: ctx.state.comboStreak || 0,
+        };
+        const newComboExt = registerRevive(comboExt);
+        result.statePatches = {
+          ...result.statePatches,
+          activeCombos: newComboExt.activeCombos,
+          killsThisTurn: newComboExt.killsThisTurn,
+          reviveHappenedThisTurn: newComboExt.reviveHappenedThisTurn,
+          comboStreak: newComboExt.comboStreak,
+        };
+      }
+
       return result;
     },
   },
